@@ -1,0 +1,263 @@
+{% extends 'base.html' %}
+
+{% block title %}My Dashboard{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">Welcome, {{ user.first_name }}!</h1>
+    <p class="text-gray-600">Manage your services and payments</p>
+</div>
+
+<!-- Stats -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-gray-500 text-sm">Active Services</p>
+                <p class="text-3xl font-bold text-blue-600">{{ active_services }}</p>
+            </div>
+            <i class="fas fa-server text-blue-500 text-3xl"></i>
+        </div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-gray-500 text-sm">Account Balance</p>
+                <p class="text-3xl font-bold text-green-600">${{ user.balance }}</p>
+            </div>
+            <i class="fas fa-wallet text-green-500 text-3xl"></i>
+        </div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-gray-500 text-sm">Pending Invoices</p>
+                <p class="text-3xl font-bold text-orange-600">{{ pending_invoices }}</p>
+            </div>
+            <i class="fas fa-file-invoice text-orange-500 text-3xl"></i>
+        </div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-gray-500 text-sm">Total Services</p>
+                <p class="text-3xl font-bold text-purple-600">{{ services|length }}</p>
+            </div>
+            <i class="fas fa-chart-line text-purple-500 text-3xl"></i>
+        </div>
+    </div>
+</div>
+
+<!-- Services -->
+<div class="bg-white rounded-lg shadow-lg mb-8">
+    <div class="p-6 border-b border-gray-200">
+        <div class="flex justify-between items-center">
+            <h2 class="text-2xl font-bold">My Services</h2>
+            <a href="/api/plans/" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                <i class="fas fa-plus mr-2"></i>New Service
+            </a>
+        </div>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plan</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP Address</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Next Due</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for service in services %}
+                <tr>
+                    <td class="px-6 py-4">{{ service.plan.name }}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-3 py-1 rounded-full text-sm font-medium
+                            {% if service.status == 'active' %}bg-green-100 text-green-800
+                            {% elif service.status == 'suspended' %}bg-red-100 text-red-800
+                            {% elif service.status == 'pending' %}bg-yellow-100 text-yellow-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ service.status|upper }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">{{ service.ip_address|default:"Pending" }}</td>
+                    <td class="px-6 py-4">{{ service.next_due_date|date:"Y-m-d" }}</td>
+                    <td class="px-6 py-4">
+                        <button class="text-blue-600 hover:text-blue-800 mr-3" onclick="viewService({{ service.id }})">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        {% if service.status == 'suspended' %}
+                        <button class="text-green-600 hover:text-green-800" onclick="reactivateService({{ service.id }})">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                        No services yet. <a href="/api/plans/" class="text-blue-600">Order your first service</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Invoices -->
+<div class="bg-white rounded-lg shadow-lg mb-8">
+    <div class="p-6 border-b border-gray-200">
+        <h2 class="text-2xl font-bold">Recent Invoices</h2>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice #</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for invoice in invoices %}
+                <tr>
+                    <td class="px-6 py-4 font-mono">{{ invoice.invoice_number }}</td>
+                    <td class="px-6 py-4">{{ invoice.description }}</td>
+                    <td class="px-6 py-4 font-bold">${{ invoice.amount }}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-3 py-1 rounded-full text-sm font-medium
+                            {% if invoice.status == 'paid' %}bg-green-100 text-green-800
+                            {% else %}bg-red-100 text-red-800{% endif %}">
+                            {{ invoice.status|upper }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">{{ invoice.due_date|date:"Y-m-d" }}</td>
+                    <td class="px-6 py-4">
+                        {% if invoice.status == 'unpaid' %}
+                        <button class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 text-sm" onclick="payInvoice({{ invoice.id }})">
+                            Pay Now
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="px-6 py-8 text-center text-gray-500">No invoices</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div id="paymentModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-8 max-w-md w-full">
+        <h3 class="text-2xl font-bold mb-4">Select Payment Method</h3>
+        <div class="space-y-3">
+            <button class="w-full bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 flex items-center justify-center" onclick="payWithMpesa()">
+                <i class="fas fa-mobile-alt mr-2"></i> Pay with M-Pesa
+            </button>
+            <button class="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 flex items-center justify-center" onclick="payWithPaypal()">
+                <i class="fab fa-paypal mr-2"></i> Pay with PayPal
+            </button>
+            <button class="w-full bg-purple-500 text-white py-3 rounded-lg hover:bg-purple-600 flex items-center justify-center" onclick="payWithBalance()">
+                <i class="fas fa-wallet mr-2"></i> Pay with Balance (${{ user.balance }})
+            </button>
+            <button class="w-full bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400" onclick="closePaymentModal()">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentInvoiceId = null;
+
+function payInvoice(invoiceId) {
+    currentInvoiceId = invoiceId;
+    document.getElementById('paymentModal').classList.remove('hidden');
+}
+
+function closePaymentModal() {
+    document.getElementById('paymentModal').classList.add('hidden');
+    currentInvoiceId = null;
+}
+
+function payWithBalance() {
+    if (!currentInvoiceId) return;
+    
+    if (confirm('Pay this invoice with your account balance?')) {
+        fetch(`/api/invoices/${currentInvoiceId}/pay_with_balance/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            location.reload();
+        })
+        .catch(error => alert('Payment failed'));
+    }
+}
+
+function payWithMpesa() {
+    const phone = prompt('Enter your M-Pesa phone number (254...):');
+    if (!phone) return;
+    
+    // Implement M-Pesa payment
+    alert('M-Pesa payment initiated. Check your phone.');
+}
+
+function payWithPaypal() {
+    alert('Redirecting to PayPal...');
+    // Implement PayPal redirect
+}
+
+function viewService(serviceId) {
+    alert('Service details view - implement as needed');
+}
+
+function reactivateService(serviceId) {
+    if (confirm('Reactivate this service? Outstanding invoices must be paid.')) {
+        fetch(`/api/services/${serviceId}/reactivate/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            location.reload();
+        })
+        .catch(error => alert('Reactivation failed'));
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

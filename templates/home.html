@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - Hosting Platform{% endblock %}
+
+{% block content %}
+<div class="text-center mb-12">
+    <h1 class="text-5xl font-bold text-gray-900 mb-4">Professional Hosting Solutions</h1>
+    <p class="text-xl text-gray-600">Automated VM deployment with M-Pesa and PayPal integration</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+    {% for plan in plans %}
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+        <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6">
+            <h3 class="text-2xl font-bold mb-2">{{ plan.name }}</h3>
+            <p class="text-3xl font-bold">${{ plan.price_monthly }}<span class="text-sm font-normal">/month</span></p>
+        </div>
+        <div class="p-6">
+            <ul class="space-y-3 mb-6">
+                <li class="flex items-center">
+                    <i class="fas fa-check text-green-500 mr-2"></i>
+                    <span>{{ plan.cpu_cores }} CPU Cores</span>
+                </li>
+                <li class="flex items-center">
+                    <i class="fas fa-check text-green-500 mr-2"></i>
+                    <span>{{ plan.ram_mb }}MB RAM</span>
+                </li>
+                <li class="flex items-center">
+                    <i class="fas fa-check text-green-500 mr-2"></i>
+                    <span>{{ plan.disk_gb }}GB SSD Storage</span>
+                </li>
+                <li class="flex items-center">
+                    <i class="fas fa-check text-green-500 mr-2"></i>
+                    <span>{{ plan.bandwidth_gb }}GB Bandwidth</span>
+                </li>
+            </ul>
+            <a href="/api/services/create/?plan={{ plan.id }}" class="block w-full bg-blue-500 text-white text-center py-3 rounded-lg hover:bg-blue-600 transition-colors">
+                Order Now
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="bg-white rounded-lg shadow-lg p-8 mb-16">
+    <h2 class="text-3xl font-bold mb-6 text-center">Why Choose Us?</h2>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="text-center">
+            <i class="fas fa-bolt text-blue-500 text-4xl mb-3"></i>
+            <h3 class="font-bold mb-2">Instant Deployment</h3>
+            <p class="text-gray-600">VMs deployed automatically within minutes</p>
+        </div>
+        <div class="text-center">
+            <i class="fas fa-credit-card text-blue-500 text-4xl mb-3"></i>
+            <h3 class="font-bold mb-2">Multiple Payments</h3>
+            <p class="text-gray-600">M-Pesa, PayPal, and account balance</p>
+        </div>
+        <div class="text-center">
+            <i class="fas fa-shield-alt text-blue-500 text-4xl mb-3"></i>
+            <h3 class="font-bold mb-2">Secure & Reliable</h3>
+            <p class="text-gray-600">Enterprise-grade infrastructure</p>
+        </div>
+        <div class="text-center">
+            <i class="fas fa-headset text-blue-500 text-4xl mb-3"></i>
+            <h3 class="font-bold mb-2">24/7 Support</h3>
+            <p class="text-gray-600">Always here to help you</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
