@@ -1,5 +1,5 @@
 from django.db import models
-from core.models import User, Service
+from django.conf import settings
 
 class Transaction(models.Model):
     PAYMENT_METHODS = [
@@ -15,8 +15,8 @@ class Transaction(models.Model):
         ('refunded', 'Refunded'),
     ]
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
-    service = models.ForeignKey(Service, on_delete=models.SET_NULL, null=True, blank=True, related_name='transactions')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='transactions')
+    service = models.ForeignKey('core.Service', on_delete=models.SET_NULL, null=True, blank=True, related_name='transactions')
     transaction_id = models.CharField(max_length=255, unique=True)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -41,8 +41,8 @@ class Invoice(models.Model):
         ('cancelled', 'Cancelled'),
     ]
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='invoices')
-    service = models.ForeignKey(Service, on_delete=models.SET_NULL, null=True, blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='invoices')
+    service = models.ForeignKey('core.Service', on_delete=models.SET_NULL, null=True, blank=True)
     invoice_number = models.CharField(max_length=100, unique=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='unpaid')

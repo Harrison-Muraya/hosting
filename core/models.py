@@ -9,6 +9,22 @@ class User(AbstractUser):
     is_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     
+    # Fix the groups and user_permissions clash
+    groups = models.ManyToManyField(
+        'auth.Group',
+        related_name='core_user_set',
+        blank=True,
+        help_text='The groups this user belongs to.',
+        verbose_name='groups',
+    )
+    user_permissions = models.ManyToManyField(
+        'auth.Permission',
+        related_name='core_user_set',
+        blank=True,
+        help_text='Specific permissions for this user.',
+        verbose_name='user permissions',
+    )
+    
     class Meta:
         db_table = 'users'
 
@@ -52,7 +68,7 @@ class Service(models.Model):
         ('annually', 'Annually'),
     ]
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='services')
+    user = models.ForeignKey('core.User', on_delete=models.CASCADE, related_name='services')
     plan = models.ForeignKey(Plan, on_delete=models.PROTECT)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     billing_cycle = models.CharField(max_length=20, choices=BILLING_CYCLES, default='monthly')

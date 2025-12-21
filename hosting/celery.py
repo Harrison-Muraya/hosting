@@ -12,10 +12,14 @@ app.autodiscover_tasks()
 app.conf.beat_schedule = {
     'check-renewals-daily': {
         'task': 'core.tasks.check_service_renewals',
-        'schedule': crontab(hour=0, minute=0),  # Daily at midnight
+        'schedule': crontab(hour=0, minute=0),
     },
     'check-suspended-services': {
         'task': 'core.tasks.check_suspended_services',
-        'schedule': crontab(hour='*/6'),  # Every 6 hours
+        'schedule': crontab(hour='*/6'),
     },
 }
+
+@app.task(bind=True)
+def debug_task(self):
+    print(f'Request: {self.request!r}')
