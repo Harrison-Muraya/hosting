@@ -1,2 +1,16 @@
 python -m venv venv
 .\venv\Scripts\activate
+
+django-admin startproject hosting .
+py manage.py startapp core
+py manage.py startapp payments
+py manage.py startapp vms
+py manage.py startapp dashboard  
+
+py manage.py makemigrations
+py manage.py migrate 
+
+py manage.py createsuperuser 
+
+pip freeze > requirements.txt  
+
