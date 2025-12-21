@@ -12,5 +12,58 @@ py manage.py migrate
 
 py manage.py createsuperuser 
 
-pip freeze > requirements.txt  
+pip freeze > requirements.txt 
+
++++++++++++++ linux ++++++++++++++++++++++++++++++
+# Delete old migrations (if any)
+rm -rf core/migrations/
+rm -rf payments/migrations/
+rm -rf vms/migrations/
+rm -rf dashboard/migrations/
+
+# Create fresh migrations directories
+mkdir core/migrations payments/migrations vms/migrations dashboard/migrations
+touch core/migrations/__init__.py
+touch payments/migrations/__init__.py
+touch vms/migrations/__init__.py
+touch dashboard/migrations/__init__.py
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+++++++++++++++ windows ++++++++++++++++++++++++++++++
+# Remove old migration folders (and all their contents)
+Remove-Item -Recurse -Force core\migrations
+Remove-Item -Recurse -Force payments\migrations
+Remove-Item -Recurse -Force vms\migrations
+Remove-Item -Recurse -Force dashboard\migrations
+
+# Recreate the migration directories
+New-Item -ItemType Directory -Force core\migrations
+New-Item -ItemType Directory -Force payments\migrations
+New-Item -ItemType Directory -Force vms\migrations
+New-Item -ItemType Directory -Force dashboard\migrations
+
+# Create empty __init__.py files in each new migrations folder
+New-Item -ItemType File core\migrations\__init__.py
+New-Item -ItemType File payments\migrations\__init__.py
+New-Item -ItemType File vms\migrations\__init__.py
+New-Item -ItemType File dashboard\migrations\__init__.py
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+# Delete database (if using SQLite)
+rm db.sqlite3
+
+# Create new migrations
+python manage.py makemigrations core
+python manage.py makemigrations payments
+python manage.py makemigrations
+
+# Apply migrations
+python manage.py migrate
+
+# Create superuser
+python manage.py createsuperuser
+
+# Run server
+python manage.py runserver
 
