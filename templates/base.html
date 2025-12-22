@@ -34,7 +34,8 @@
                                 <i class="fas fa-cog mr-1"></i> Admin
                             </a>
                         {% endif %}
-                        <form method="post" action="{% url 'api_logout' %}" class="inline">
+                        <!-- <form method="post" action="{% url 'api_logout' %}" class="inline"> -->
+                        <form id="logout" method="post" class="inline">
                             {% csrf_token %}
                             <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">
                                 <i class="fas fa-sign-out-alt mr-1"></i> Logout
@@ -100,9 +101,37 @@
                 </div>
             </div>
             <div class="border-t border-gray-700 mt-8 pt-8 text-center">
-                <p class="text-gray-400">&copy; 2024 HostPro. All rights reserved.</p>
+                <p class="text-gray-400">&copy; 2025 HostPro. All rights reserved.</p>
             </div>
         </div>
     </footer>
+    <script>
+       const logoutForm = document.getElementById('logout');
+       logoutForm.addEventListener('submit', async (e) => {
+           e.preventDefault();
+           try {
+               const response = await fetch("{% url 'api_logout' %}", {
+                   method: 'POST',
+                   headers: {
+                       'X-CSRFToken': '{{ csrf_token }}'
+                   }
+               });
+               const data = await response.json();
+               if (data.success) {
+                   // Clear local storage
+                   localStorage.removeItem('authToken');
+                   localStorage.removeItem('user');
+                   
+                   // Redirect to homepage or login page
+                   window.location.href = data.redirect_url || '/';
+               } else {
+                   alert('Logout failed. Please try again.');
+               }
+           } catch (error) {
+               console.error('Error during logout:', error);
+               alert('An error occurred. Please try again.');
+           }
+       });
+    </script>
 </body>
 </html>
