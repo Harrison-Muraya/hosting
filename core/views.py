@@ -102,7 +102,7 @@ def logout(request):
         return Response({
             'success': True,
             'message': 'Successfully logged out.',
-            'redirect_url': '/dashboard/'
+            'redirect_url': '/'
         })
     except Exception as e:
         return Response({
