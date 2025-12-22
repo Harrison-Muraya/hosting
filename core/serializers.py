@@ -75,12 +75,23 @@ class PlanSerializer(serializers.ModelSerializer):
 class ServiceSerializer(serializers.ModelSerializer):
     plan_details = PlanSerializer(source='plan', read_only=True)
     user_email = serializers.EmailField(source='user.email', read_only=True)
+    user_name = serializers.SerializerMethodField()
     
     class Meta:
         model = Service
-        fields = '__all__'
-        read_only_fields = ['vm_id', 'ip_address', 'username', 'password', 
-                            'created_at', 'activated_at', 'suspended_at', 'terminated_at']
+        fields = [
+            'id', 'user', 'user_email', 'user_name', 'plan', 'plan_details',
+            'status', 'billing_cycle', 'price', 'next_due_date', 'domain',
+            'vm_id', 'ip_address', 'username', 'password',
+            'created_at', 'activated_at', 'suspended_at', 'terminated_at'
+        ]
+        read_only_fields = [
+            'vm_id', 'ip_address', 'username', 'password',
+            'created_at', 'activated_at', 'suspended_at', 'terminated_at'
+        ]
+    
+    def get_user_name(self, obj):
+        return f"{obj.user.first_name} {obj.user.last_name}" if obj.user.first_name else obj.user.username
 
 class TransactionSerializer(serializers.ModelSerializer):
     user_email = serializers.EmailField(source='user.email', read_only=True)

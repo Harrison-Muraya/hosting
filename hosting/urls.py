@@ -24,6 +24,9 @@ from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from rest_framework import permissions
 
+from core.admin_views import AdminPlanViewSet, bulk_activate_plans, bulk_deactivate_plans, duplicate_plan
+
+
 # Swagger/API Documentation
 schema_view = get_schema_view(
     openapi.Info(
@@ -37,15 +40,19 @@ schema_view = get_schema_view(
     permission_classes=[permissions.AllowAny],
 )
 
-# REST Framework Router
+# REST Framework Router for public APIs
 router = DefaultRouter()
 router.register(r'plans', core_views.PlanViewSet, basename='plan')
 router.register(r'services', core_views.ServiceViewSet, basename='service')
 router.register(r'transactions', core_views.TransactionViewSet, basename='transaction')
 router.register(r'invoices', core_views.InvoiceViewSet, basename='invoice')
 
+# Admin Router
+admin_router = DefaultRouter()
+admin_router.register(r'plans', AdminPlanViewSet, basename='admin-plan')
+
 urlpatterns = [
-    # Django Admin
+    # Django Admin - This should come AFTER your custom admin routes
     path('admin/', admin.site.urls),
     
     # API Routes
@@ -59,6 +66,12 @@ urlpatterns = [
     path('api/profile/update/', core_views.update_profile, name='api_update_profile'),
     path('api/change-password/', core_views.change_password, name='api_change_password'),
     
+    # Admin API Routes
+    path('api/admin/', include(admin_router.urls)),
+    path('api/admin/plans/bulk-activate/', bulk_activate_plans, name='bulk_activate_plans'),
+    path('api/admin/plans/bulk-deactivate/', bulk_deactivate_plans, name='bulk_deactivate_plans'),
+    path('api/admin/plans/<int:plan_id>/duplicate/', duplicate_plan, name='duplicate_plan'),
+    
     # Webhooks
     path('api/webhooks/mpesa/', core_views.mpesa_callback, name='mpesa_callback'),
     path('api/webhooks/paypal/', core_views.paypal_webhook, name='paypal_webhook'),
@@ -67,7 +80,7 @@ urlpatterns = [
     path('api/docs/', schema_view.with_ui('swagger', cache_timeout=0), name='api_docs'),
     path('api/redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='api_redoc'),
     
-    # Dashboard/Frontend Views
+    # Dashboard/Frontend Views - This should come LAST
     path('', include('dashboard.urls')),
 ]
 

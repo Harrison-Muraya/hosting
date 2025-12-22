@@ -1,0 +1,605 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage Plans - Admin{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">Manage Hosting Plans</h1>
+            <p class="text-gray-600">Create, edit, and manage your hosting plans</p>
+        </div>
+        <button onclick="openAddModal()" class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all transform hover:scale-105 shadow-lg">
+            <i class="fas fa-plus mr-2"></i> Add New Plan
+        </button>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-gray-500 text-sm">Total Plans</p>
+                <p class="text-3xl font-bold text-blue-600">{{ total_plans }}</p>
+            </div>
+            <i class="fas fa-server text-blue-500 text-3xl"></i>
+        </div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-gray-500 text-sm">Active Plans</p>
+                <p class="text-3xl font-bold text-green-600">{{ active_plans }}</p>
+            </div>
+            <i class="fas fa-check-circle text-green-500 text-3xl"></i>
+        </div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-gray-500 text-sm">Inactive Plans</p>
+                <p class="text-3xl font-bold text-gray-600">{{ inactive_plans }}</p>
+            </div>
+            <i class="fas fa-times-circle text-gray-500 text-3xl"></i>
+        </div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-gray-500 text-sm">Active Services</p>
+                <p class="text-3xl font-bold text-purple-600">{{ active_services }}</p>
+            </div>
+            <i class="fas fa-users text-purple-500 text-3xl"></i>
+        </div>
+    </div>
+</div>
+
+<!-- Success/Error Messages -->
+<div id="alertMessage" class="hidden mb-6"></div>
+
+<!-- Plans Table -->
+<div class="bg-white rounded-lg shadow-lg overflow-hidden">
+    <div class="p-6 border-b border-gray-200">
+        <div class="flex justify-between items-center">
+            <h2 class="text-xl font-bold">All Plans</h2>
+            <div class="flex space-x-2">
+                <input type="text" id="searchInput" placeholder="Search plans..." 
+                       class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                       onkeyup="filterPlans()">
+                <select id="filterStatus" onchange="filterPlans()" 
+                        class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plan Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Resources</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pricing</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Active Users</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200" id="plansTableBody">
+                {% for plan in plans %}
+                <tr class="hover:bg-gray-50 plan-row" data-plan-id="{{ plan.id }}" data-status="{% if plan.is_active %}active{% else %}inactive{% endif %}">
+                    <td class="px-6 py-4">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-server text-blue-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-bold text-gray-900 plan-name">{{ plan.name }}</div>
+                                <div class="text-sm text-gray-500">ID: {{ plan.id }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            {{ plan.get_plan_type_display }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm">
+                        <div class="space-y-1">
+                            <div><i class="fas fa-microchip text-gray-400 w-4"></i> {{ plan.cpu_cores }} Core{{ plan.cpu_cores|pluralize }}</div>
+                            <div><i class="fas fa-memory text-gray-400 w-4"></i> {{ plan.ram_mb }} MB RAM</div>
+                            <div><i class="fas fa-hdd text-gray-400 w-4"></i> {{ plan.disk_gb }} GB SSD</div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-sm">
+                        <div class="space-y-1">
+                            <div class="font-bold text-blue-600">${{ plan.price_monthly }}/mo</div>
+                            {% if plan.price_quarterly %}<div class="text-gray-600">${{ plan.price_quarterly }}/qtr</div>{% endif %}
+                            {% if plan.price_annually %}<div class="text-gray-600">${{ plan.price_annually }}/yr</div>{% endif %}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if plan.is_active %}
+                        <span class="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <i class="fas fa-check-circle mr-1"></i> Active
+                        </span>
+                        {% else %}
+                        <span class="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            <i class="fas fa-times-circle mr-1"></i> Inactive
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="text-sm font-bold">{{ plan.service_set.count }}</span>
+                        <span class="text-xs text-gray-500">service{{ plan.service_set.count|pluralize }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex space-x-2">
+                            <button onclick="viewPlan({{ plan.id }})" 
+                                    class="text-blue-600 hover:text-blue-800" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button onclick="editPlan({{ plan.id }})" 
+                                    class="text-yellow-600 hover:text-yellow-800" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="togglePlanStatus({{ plan.id }}, {{ plan.is_active|lower }})" 
+                                    class="{% if plan.is_active %}text-orange-600 hover:text-orange-800{% else %}text-green-600 hover:text-green-800{% endif %}" 
+                                    title="{% if plan.is_active %}Deactivate{% else %}Activate{% endif %}">
+                                <i class="fas fa-{% if plan.is_active %}pause{% else %}play{% endif %}-circle"></i>
+                            </button>
+                            <button onclick="deletePlan({{ plan.id }}, '{{ plan.name }}')" 
+                                    class="text-red-600 hover:text-red-800" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                        <i class="fas fa-inbox text-4xl mb-2"></i>
+                        <p>No plans available. Click "Add New Plan" to create one.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add/Edit Plan Modal -->
+<div id="planModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-screen overflow-y-auto">
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-2xl font-bold" id="modalTitle">
+                    <i class="fas fa-server mr-2"></i> Add New Plan
+                </h3>
+                <button onclick="closeModal()" class="text-white hover:text-gray-200">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <form id="planForm" class="p-8">
+            {% csrf_token %}
+            <input type="hidden" id="planId" name="plan_id">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Plan Name -->
+                <div class="md:col-span-2">
+                    <label for="planName" class="block text-sm font-bold text-gray-700 mb-2">
+                        Plan Name *
+                    </label>
+                    <input type="text" id="planName" name="name" required
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="e.g., Starter VPS">
+                </div>
+
+                <!-- Plan Type -->
+                <div>
+                    <label for="planType" class="block text-sm font-bold text-gray-700 mb-2">
+                        Plan Type *
+                    </label>
+                    <select id="planType" name="plan_type" required
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="vps">VPS</option>
+                        <option value="shared">Shared Hosting</option>
+                        <option value="dedicated">Dedicated Server</option>
+                    </select>
+                </div>
+
+                <!-- Status -->
+                <div>
+                    <label for="isActive" class="block text-sm font-bold text-gray-700 mb-2">
+                        Status *
+                    </label>
+                    <select id="isActive" name="is_active" required
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="true">Active</option>
+                        <option value="false">Inactive</option>
+                    </select>
+                </div>
+
+                <!-- CPU Cores -->
+                <div>
+                    <label for="cpuCores" class="block text-sm font-bold text-gray-700 mb-2">
+                        <i class="fas fa-microchip mr-1"></i> CPU Cores *
+                    </label>
+                    <input type="number" id="cpuCores" name="cpu_cores" required min="1"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="2">
+                </div>
+
+                <!-- RAM (MB) -->
+                <div>
+                    <label for="ramMb" class="block text-sm font-bold text-gray-700 mb-2">
+                        <i class="fas fa-memory mr-1"></i> RAM (MB) *
+                    </label>
+                    <input type="number" id="ramMb" name="ram_mb" required min="512"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="4096">
+                </div>
+
+                <!-- Disk (GB) -->
+                <div>
+                    <label for="diskGb" class="block text-sm font-bold text-gray-700 mb-2">
+                        <i class="fas fa-hdd mr-1"></i> Disk Space (GB) *
+                    </label>
+                    <input type="number" id="diskGb" name="disk_gb" required min="10"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="80">
+                </div>
+
+                <!-- Bandwidth (GB) -->
+                <div>
+                    <label for="bandwidthGb" class="block text-sm font-bold text-gray-700 mb-2">
+                        <i class="fas fa-exchange-alt mr-1"></i> Bandwidth (GB) *
+                    </label>
+                    <input type="number" id="bandwidthGb" name="bandwidth_gb" required min="100"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="2000">
+                </div>
+
+                <!-- Monthly Price -->
+                <div>
+                    <label for="priceMonthly" class="block text-sm font-bold text-gray-700 mb-2">
+                        <i class="fas fa-dollar-sign mr-1"></i> Monthly Price *
+                    </label>
+                    <input type="number" id="priceMonthly" name="price_monthly" required min="0" step="0.01"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="15.00">
+                </div>
+
+                <!-- Quarterly Price -->
+                <div>
+                    <label for="priceQuarterly" class="block text-sm font-bold text-gray-700 mb-2">
+                        Quarterly Price (Optional)
+                    </label>
+                    <input type="number" id="priceQuarterly" name="price_quarterly" min="0" step="0.01"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="40.50">
+                </div>
+
+                <!-- Annual Price -->
+                <div>
+                    <label for="priceAnnually" class="block text-sm font-bold text-gray-700 mb-2">
+                        Annual Price (Optional)
+                    </label>
+                    <input type="number" id="priceAnnually" name="price_annually" min="0" step="0.01"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="150.00">
+                </div>
+
+                <!-- Description -->
+                <div class="md:col-span-2">
+                    <label for="description" class="block text-sm font-bold text-gray-700 mb-2">
+                        Description
+                    </label>
+                    <textarea id="description" name="description" rows="4"
+                              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="Brief description of this plan..."></textarea>
+                </div>
+            </div>
+
+            <!-- Error Message -->
+            <div id="formError" class="hidden mt-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"></div>
+
+            <!-- Buttons -->
+            <div class="flex justify-end space-x-4 mt-8">
+                <button type="button" onclick="closeModal()"
+                        class="px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition">
+                    Cancel
+                </button>
+                <button type="submit" id="submitBtn"
+                        class="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition">
+                    <i class="fas fa-save mr-2"></i> Save Plan
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- View Plan Modal -->
+<div id="viewModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full">
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-2xl font-bold" id="viewPlanName">Plan Details</h3>
+                <button onclick="closeViewModal()" class="text-white hover:text-gray-200">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+        </div>
+        <div class="p-8" id="viewPlanContent">
+            <!-- Content will be populated dynamically -->
+        </div>
+    </div>
+</div>
+
+<script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function showAlert(message, type = 'success') {
+    const alertDiv = document.getElementById('alertMessage');
+    alertDiv.className = `mb-6 px-4 py-3 rounded ${type === 'success' ? 'bg-green-100 border border-green-400 text-green-700' : 'bg-red-100 border border-red-400 text-red-700'}`;
+    alertDiv.textContent = message;
+    alertDiv.classList.remove('hidden');
+    setTimeout(() => alertDiv.classList.add('hidden'), 5000);
+}
+
+function openAddModal() {
+    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-plus mr-2"></i> Add New Plan';
+    document.getElementById('planForm').reset();
+    document.getElementById('planId').value = '';
+    document.getElementById('planModal').classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('planModal').classList.add('hidden');
+    document.getElementById('formError').classList.add('hidden');
+}
+
+function closeViewModal() {
+    document.getElementById('viewModal').classList.add('hidden');
+}
+
+async function editPlan(planId) {
+    try {
+        const response = await fetch(`/api/admin/plans/${planId}/`, {
+            credentials: 'same-origin'
+        });
+        const plan = await response.json();
+        
+        document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit mr-2"></i> Edit Plan';
+        document.getElementById('planId').value = plan.id;
+        document.getElementById('planName').value = plan.name;
+        document.getElementById('planType').value = plan.plan_type;
+        document.getElementById('isActive').value = plan.is_active.toString();
+        document.getElementById('cpuCores').value = plan.cpu_cores;
+        document.getElementById('ramMb').value = plan.ram_mb;
+        document.getElementById('diskGb').value = plan.disk_gb;
+        document.getElementById('bandwidthGb').value = plan.bandwidth_gb;
+        document.getElementById('priceMonthly').value = plan.price_monthly;
+        document.getElementById('priceQuarterly').value = plan.price_quarterly || '';
+        document.getElementById('priceAnnually').value = plan.price_annually || '';
+        document.getElementById('description').value = plan.description || '';
+        
+        document.getElementById('planModal').classList.remove('hidden');
+    } catch (error) {
+        showAlert('Failed to load plan details', 'error');
+    }
+}
+
+async function viewPlan(planId) {
+    try {
+        const response = await fetch(`/api/admin/plans/${planId}/`, {
+            credentials: 'same-origin'
+        });
+        const plan = await response.json();
+        
+        document.getElementById('viewPlanName').textContent = plan.name;
+        document.getElementById('viewPlanContent').innerHTML = `
+            <div class="grid grid-cols-2 gap-6">
+                <div>
+                    <p class="text-sm text-gray-500 mb-1">Plan Type</p>
+                    <p class="font-bold">${plan.plan_type.toUpperCase()}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500 mb-1">Status</p>
+                    <p class="font-bold">${plan.is_active ? '✅ Active' : '❌ Inactive'}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500 mb-1">CPU Cores</p>
+                    <p class="font-bold">${plan.cpu_cores} Cores</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500 mb-1">RAM</p>
+                    <p class="font-bold">${plan.ram_mb} MB</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500 mb-1">Disk Space</p>
+                    <p class="font-bold">${plan.disk_gb} GB SSD</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500 mb-1">Bandwidth</p>
+                    <p class="font-bold">${plan.bandwidth_gb} GB</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500 mb-1">Monthly Price</p>
+                    <p class="font-bold text-blue-600 text-xl">$${plan.price_monthly}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500 mb-1">Quarterly Price</p>
+                    <p class="font-bold text-blue-600">${plan.price_quarterly ? '$' + plan.price_quarterly : 'N/A'}</p>
+                </div>
+                <div class="col-span-2">
+                    <p class="text-sm text-gray-500 mb-1">Annual Price</p>
+                    <p class="font-bold text-blue-600">${plan.price_annually ? '$' + plan.price_annually : 'N/A'}</p>
+                </div>
+                <div class="col-span-2">
+                    <p class="text-sm text-gray-500 mb-1">Description</p>
+                    <p class="text-gray-700">${plan.description || 'No description'}</p>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('viewModal').classList.remove('hidden');
+    } catch (error) {
+        showAlert('Failed to load plan details', 'error');
+    }
+}
+
+document.getElementById('planForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const errorDiv = document.getElementById('formError');
+    const submitBtn = document.getElementById('submitBtn');
+    errorDiv.classList.add('hidden');
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Saving...';
+    
+    const planId = document.getElementById('planId').value;
+    const formData = {
+        name: document.getElementById('planName').value,
+        plan_type: document.getElementById('planType').value,
+        is_active: document.getElementById('isActive').value === 'true',
+        cpu_cores: parseInt(document.getElementById('cpuCores').value),
+        ram_mb: parseInt(document.getElementById('ramMb').value),
+        disk_gb: parseInt(document.getElementById('diskGb').value),
+        bandwidth_gb: parseInt(document.getElementById('bandwidthGb').value),
+        price_monthly: parseFloat(document.getElementById('priceMonthly').value),
+        price_quarterly: document.getElementById('priceQuarterly').value ? parseFloat(document.getElementById('priceQuarterly').value) : null,
+        price_annually: document.getElementById('priceAnnually').value ? parseFloat(document.getElementById('priceAnnually').value) : null,
+        description: document.getElementById('description').value
+    };
+    
+    try {
+        const url = planId ? `/api/admin/plans/${planId}/` : '/api/admin/plans/';
+        const method = planId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(formData)
+        });
+        
+        if (response.ok) {
+            showAlert(planId ? 'Plan updated successfully!' : 'Plan created successfully!', 'success');
+            closeModal();
+            location.reload();
+        } else {
+            const data = await response.json();
+            errorDiv.textContent = data.error || 'Failed to save plan';
+            errorDiv.classList.remove('hidden');
+        }
+    } catch (error) {
+        errorDiv.textContent = 'An error occurred. Please try again.';
+        errorDiv.classList.remove('hidden');
+    }
+    
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="fas fa-save mr-2"></i> Save Plan';
+});
+
+async function togglePlanStatus(planId, currentStatus) {
+    if (!confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'} this plan?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/admin/plans/${planId}/toggle/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            credentials: 'same-origin'
+        });
+        
+        if (response.ok) {
+            showAlert('Plan status updated successfully!', 'success');
+            location.reload();
+        } else {
+            showAlert('Failed to update plan status', 'error');
+        }
+    } catch (error) {
+        showAlert('An error occurred', 'error');
+    }
+}
+
+async function deletePlan(planId, planName) {
+    if (!confirm(`Are you sure you want to delete "${planName}"? This action cannot be undone!`)) {
+        return;
+    }
+    
+    if (!confirm('This will permanently delete the plan. Continue?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/admin/plans/${planId}/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            credentials: 'same-origin'
+        });
+        
+        if (response.ok) {
+            showAlert('Plan deleted successfully!', 'success');
+            location.reload();
+        } else {
+            const data = await response.json();
+            showAlert(data.error || 'Failed to delete plan', 'error');
+        }
+    } catch (error) {
+        showAlert('An error occurred', 'error');
+    }
+}
+
+function filterPlans() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const statusFilter = document.getElementById('filterStatus').value;
+    const rows = document.querySelectorAll('.plan-row');
+    
+    rows.forEach(row => {
+        const planName = row.querySelector('.plan-name').textContent.toLowerCase();
+        const planStatus = row.dataset.status;
+        
+        const matchesSearch = planName.includes(searchTerm);
+        const matchesStatus = !statusFilter || planStatus === statusFilter;
+        
+        if (matchesSearch && matchesStatus) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+</script>
+{% endblock %}

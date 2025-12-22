@@ -169,35 +169,76 @@ def change_password(request):
     })
 
 class PlanViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoint for viewing hosting plans
+    GET /api/plans/ - List all active plans
+    GET /api/plans/{id}/ - Get specific plan details
+    """
     queryset = Plan.objects.filter(is_active=True)
     serializer_class = PlanSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [permissions.AllowAny]  # Public endpoint
 
 class ServiceViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing services
+    1. List user's services
+    2. Create new service order
+    3. Reactivate suspended service
+    4. Get service credentials
+    """
     serializer_class = ServiceSerializer
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
+        """Users can only see their own services, staff can see all"""
         if self.request.user.is_staff:
             return Service.objects.all()
         return Service.objects.filter(user=self.request.user)
     
     def create(self, request):
+        """
+        Create a new service order
+        
+        POST /api/services/
+        {
+            "plan_id": 1,
+            "billing_cycle": "monthly",
+            "domain": "example.com"  // optional
+        }
+        """
         plan_id = request.data.get('plan_id')
         billing_cycle = request.data.get('billing_cycle', 'monthly')
+        domain = request.data.get('domain', '')
         
+        # Validate plan
         try:
             plan = Plan.objects.get(id=plan_id, is_active=True)
         except Plan.DoesNotExist:
-            return Response({'error': 'Plan not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({
+                'error': 'Plan not found or is no longer available'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Validate billing cycle
+        if billing_cycle not in ['monthly', 'quarterly', 'annually']:
+            return Response({
+                'error': 'Invalid billing cycle. Choose: monthly, quarterly, or annually'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         # Calculate price based on billing cycle
         if billing_cycle == 'quarterly':
-            price = plan.price_quarterly or plan.price_monthly * 3
+            price = plan.price_quarterly if plan.price_quarterly else plan.price_monthly * 3
         elif billing_cycle == 'annually':
-            price = plan.price_annually or plan.price_monthly * 12
+            price = plan.price_annually if plan.price_annually else plan.price_monthly * 12
         else:
             price = plan.price_monthly
+        
+        # Calculate next due date
+        if billing_cycle == 'monthly':
+            next_due = timezone.now() + timedelta(days=30)
+        elif billing_cycle == 'quarterly':
+            next_due = timezone.now() + timedelta(days=90)
+        else:
+            next_due = timezone.now() + timedelta(days=365)
         
         # Create service
         service = Service.objects.create(
@@ -205,7 +246,8 @@ class ServiceViewSet(viewsets.ModelViewSet):
             plan=plan,
             billing_cycle=billing_cycle,
             price=price,
-            next_due_date=timezone.now() + timezone.timedelta(days=30),
+            next_due_date=next_due,
+            domain=domain,
             status='pending'
         )
         
@@ -215,35 +257,80 @@ class ServiceViewSet(viewsets.ModelViewSet):
             service=service,
             invoice_number=f'INV-{uuid.uuid4().hex[:8].upper()}',
             amount=price,
-            due_date=timezone.now() + timezone.timedelta(days=7),
-            description=f'New {plan.name} service'
+            due_date=timezone.now() + timedelta(days=7),
+            description=f'New {plan.name} service - {billing_cycle} billing'
         )
         
         return Response({
+            'success': True,
+            'message': 'Service created successfully! Please proceed to payment.',
             'service': ServiceSerializer(service).data,
-            'invoice': InvoiceSerializer(invoice).data
+            'invoice': {
+                'id': invoice.id,
+                'invoice_number': invoice.invoice_number,
+                'amount': str(invoice.amount),
+                'due_date': invoice.due_date.isoformat(),
+                'status': invoice.status
+            }
         }, status=status.HTTP_201_CREATED)
     
     @action(detail=True, methods=['post'])
     def reactivate(self, request, pk=None):
+        """
+        Reactivate a suspended service
+        
+        POST /api/services/{id}/reactivate/
+        """
         service = self.get_object()
         
         if service.status != 'suspended':
-            return Response({'error': 'Service is not suspended'}, 
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                'error': 'Service is not suspended'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Check if user has paid
+        # Check for unpaid invoices
         unpaid_invoices = Invoice.objects.filter(
             service=service,
             status='unpaid'
         ).count()
         
         if unpaid_invoices > 0:
-            return Response({'error': 'Please pay outstanding invoices first'}, 
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                'error': f'Please pay {unpaid_invoices} outstanding invoice(s) first'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Trigger reactivation task
+        from core.tasks import reactivate_service_task
         reactivate_service_task.delay(service.id)
-        return Response({'message': 'Service reactivation initiated'})
+        
+        return Response({
+            'success': True,
+            'message': 'Service reactivation initiated. Your VM will be started shortly.'
+        })
+    
+    @action(detail=True, methods=['get'])
+    def credentials(self, request, pk=None):
+        """
+        Get service credentials (IP, username, password)
+        
+        GET /api/services/{id}/credentials/
+        """
+        service = self.get_object()
+        
+        if service.status != 'active':
+            return Response({
+                'error': 'Service must be active to view credentials'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response({
+            'success': True,
+            'credentials': {
+                'ip_address': service.ip_address,
+                'username': service.username,
+                'password': service.password,
+                'ssh_command': f'ssh {service.username}@{service.ip_address}' if service.ip_address else None
+            }
+        })
 
 class TransactionViewSet(viewsets.ModelViewSet):
     serializer_class = TransactionSerializer

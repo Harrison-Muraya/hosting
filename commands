@@ -67,3 +67,6 @@ python manage.py createsuperuser
 # Run server
 python manage.py runserver
 
+
+# To run the command:
+python manage.py populate_plans

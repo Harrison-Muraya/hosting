@@ -1,0 +1,444 @@
+{% extends 'base.html' %}
+
+{% block title %}Hosting Plans - HostPro{% endblock %}
+
+{% block content %}
+<div class="mb-12">
+    <!-- Header Section -->
+    <div class="text-center mb-12">
+        <h1 class="text-5xl font-bold text-gray-900 mb-4">Choose Your Perfect Plan</h1>
+        <p class="text-xl text-gray-600">Flexible hosting solutions for every need</p>
+    </div>
+
+    <!-- Billing Cycle Toggle -->
+    <div class="flex justify-center mb-12">
+        <div class="bg-white rounded-lg shadow-md p-2 inline-flex">
+            <button onclick="changeBillingCycle('monthly')" id="monthlyBtn" 
+                    class="px-6 py-3 rounded-lg font-semibold transition-all billing-btn active">
+                Monthly
+            </button>
+            <button onclick="changeBillingCycle('quarterly')" id="quarterlyBtn" 
+                    class="px-6 py-3 rounded-lg font-semibold transition-all billing-btn">
+                Quarterly <span class="text-green-600 text-sm">(Save 10%)</span>
+            </button>
+            <button onclick="changeBillingCycle('annually')" id="annuallyBtn" 
+                    class="px-6 py-3 rounded-lg font-semibold transition-all billing-btn">
+                Annually <span class="text-green-600 text-sm">(Save 20%)</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Plans Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+        {% for plan in plans %}
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 plan-card" 
+             data-plan-id="{{ plan.id }}"
+             data-monthly="{{ plan.price_monthly }}"
+             data-quarterly="{{ plan.price_quarterly|default:plan.price_monthly }}"
+             data-annually="{{ plan.price_annually|default:plan.price_monthly }}">
+            
+            <!-- Plan Header -->
+            <div class="{% if forloop.counter == 2 %}bg-gradient-to-r from-blue-600 to-indigo-600{% else %}bg-gradient-to-r from-gray-700 to-gray-800{% endif %} text-white p-6 text-center relative">
+                {% if forloop.counter == 2 %}
+                <div class="absolute top-2 right-2">
+                    <span class="bg-yellow-400 text-gray-900 text-xs font-bold px-3 py-1 rounded-full">
+                        POPULAR
+                    </span>
+                </div>
+                {% endif %}
+                <h3 class="text-2xl font-bold mb-2">{{ plan.name }}</h3>
+                <div class="text-4xl font-bold mb-2">
+                    $<span class="plan-price">{{ plan.price_monthly }}</span>
+                </div>
+                <p class="text-sm opacity-90">/month</p>
+            </div>
+
+            <!-- Plan Features -->
+            <div class="p-6">
+                <ul class="space-y-4 mb-6">
+                    <li class="flex items-start">
+                        <i class="fas fa-microchip text-blue-500 mr-3 mt-1"></i>
+                        <span><strong>{{ plan.cpu_cores }}</strong> CPU Core{{ plan.cpu_cores|pluralize }}</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-memory text-blue-500 mr-3 mt-1"></i>
+                        <span><strong>{{ plan.ram_mb|filesizeformat }}</strong> RAM</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-hdd text-blue-500 mr-3 mt-1"></i>
+                        <span><strong>{{ plan.disk_gb }} GB</strong> SSD Storage</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-exchange-alt text-blue-500 mr-3 mt-1"></i>
+                        <span><strong>{{ plan.bandwidth_gb }} GB</strong> Bandwidth</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-shield-alt text-blue-500 mr-3 mt-1"></i>
+                        <span>DDoS Protection</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-server text-blue-500 mr-3 mt-1"></i>
+                        <span>Full Root Access</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-clock text-blue-500 mr-3 mt-1"></i>
+                        <span>24/7 Support</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-rocket text-blue-500 mr-3 mt-1"></i>
+                        <span>Instant Setup</span>
+                    </li>
+                </ul>
+
+                <p class="text-sm text-gray-600 mb-6">{{ plan.description }}</p>
+
+                <button onclick="orderPlan({{ plan.id }}, '{{ plan.name }}')" 
+                        class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all transform hover:scale-105 shadow-md">
+                    <i class="fas fa-cart-plus mr-2"></i> Order Now
+                </button>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-4 text-center py-12">
+            <i class="fas fa-inbox text-gray-400 text-6xl mb-4"></i>
+            <p class="text-xl text-gray-600">No plans available at the moment.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Features Comparison Section -->
+    <div class="bg-white rounded-xl shadow-lg p-8 mb-16">
+        <h2 class="text-3xl font-bold text-center mb-8">Compare Plans</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-4 text-left text-sm font-bold text-gray-700">Feature</th>
+                        {% for plan in plans %}
+                        <th class="px-6 py-4 text-center text-sm font-bold text-gray-700">{{ plan.name }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    <tr>
+                        <td class="px-6 py-4 font-medium">CPU Cores</td>
+                        {% for plan in plans %}
+                        <td class="px-6 py-4 text-center">{{ plan.cpu_cores }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr class="bg-gray-50">
+                        <td class="px-6 py-4 font-medium">RAM</td>
+                        {% for plan in plans %}
+                        <td class="px-6 py-4 text-center">{{ plan.ram_mb }} MB</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td class="px-6 py-4 font-medium">Storage</td>
+                        {% for plan in plans %}
+                        <td class="px-6 py-4 text-center">{{ plan.disk_gb }} GB SSD</td>
+                        {% endfor %}
+                    </tr>
+                    <tr class="bg-gray-50">
+                        <td class="px-6 py-4 font-medium">Bandwidth</td>
+                        {% for plan in plans %}
+                        <td class="px-6 py-4 text-center">{{ plan.bandwidth_gb }} GB</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td class="px-6 py-4 font-medium">DDoS Protection</td>
+                        {% for plan in plans %}
+                        <td class="px-6 py-4 text-center"><i class="fas fa-check text-green-500"></i></td>
+                        {% endfor %}
+                    </tr>
+                    <tr class="bg-gray-50">
+                        <td class="px-6 py-4 font-medium">Root Access</td>
+                        {% for plan in plans %}
+                        <td class="px-6 py-4 text-center"><i class="fas fa-check text-green-500"></i></td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td class="px-6 py-4 font-medium">24/7 Support</td>
+                        {% for plan in plans %}
+                        <td class="px-6 py-4 text-center"><i class="fas fa-check text-green-500"></i></td>
+                        {% endfor %}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Why Choose Us -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+        <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+            <div class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-bolt text-blue-600 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-bold mb-3">Instant Deployment</h3>
+            <p class="text-gray-600">Your VM is deployed automatically within 5 minutes of payment confirmation.</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+            <div class="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-shield-alt text-green-600 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-bold mb-3">Enterprise Security</h3>
+            <p class="text-gray-600">Advanced DDoS protection, firewalls, and regular security updates included.</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+            <div class="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-headset text-purple-600 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-bold mb-3">24/7 Support</h3>
+            <p class="text-gray-600">Our expert support team is always available to help you succeed.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Order Modal -->
+<div id="orderModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-screen overflow-y-auto">
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-2xl font-bold">
+                    <i class="fas fa-shopping-cart mr-2"></i> Order <span id="modalPlanName"></span>
+                </h3>
+                <button onclick="closeOrderModal()" class="text-white hover:text-gray-200">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="p-8">
+            <!-- Login Required Message (if not authenticated) -->
+            {% if not user.is_authenticated %}
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                <p class="text-yellow-800 flex items-center">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    You need to <a href="/auth/login/" class="font-bold underline">login</a> or 
+                    <a href="/auth/register/" class="font-bold underline">register</a> to order a plan.
+                </p>
+            </div>
+            {% else %}
+            
+            <form id="orderForm">
+                {% csrf_token %}
+                <input type="hidden" id="orderPlanId" name="plan_id">
+
+                <!-- Billing Cycle Selection -->
+                <div class="mb-6">
+                    <label class="block text-sm font-bold text-gray-700 mb-3">Select Billing Cycle</label>
+                    <div class="grid grid-cols-3 gap-4">
+                        <label class="relative">
+                            <input type="radio" name="billing_cycle" value="monthly" checked class="peer sr-only">
+                            <div class="border-2 border-gray-300 rounded-lg p-4 cursor-pointer peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
+                                <p class="font-bold text-center">Monthly</p>
+                                <p class="text-2xl font-bold text-center text-blue-600" id="monthlyPrice">$0</p>
+                                <p class="text-sm text-center text-gray-500">/month</p>
+                            </div>
+                        </label>
+                        <label class="relative">
+                            <input type="radio" name="billing_cycle" value="quarterly" class="peer sr-only">
+                            <div class="border-2 border-gray-300 rounded-lg p-4 cursor-pointer peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
+                                <p class="font-bold text-center">Quarterly</p>
+                                <p class="text-2xl font-bold text-center text-blue-600" id="quarterlyPrice">$0</p>
+                                <p class="text-sm text-center text-gray-500">/3 months</p>
+                                <span class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded">Save 10%</span>
+                            </div>
+                        </label>
+                        <label class="relative">
+                            <input type="radio" name="billing_cycle" value="annually" class="peer sr-only">
+                            <div class="border-2 border-gray-300 rounded-lg p-4 cursor-pointer peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
+                                <p class="font-bold text-center">Annually</p>
+                                <p class="text-2xl font-bold text-center text-blue-600" id="annuallyPrice">$0</p>
+                                <p class="text-sm text-center text-gray-500">/year</p>
+                                <span class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded">Save 20%</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Optional: Domain Name -->
+                <div class="mb-6">
+                    <label for="domain" class="block text-sm font-bold text-gray-700 mb-2">
+                        Domain Name (Optional)
+                    </label>
+                    <input type="text" id="domain" name="domain"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="example.com">
+                    <p class="text-sm text-gray-500 mt-1">You can add or change this later</p>
+                </div>
+
+                <!-- Order Summary -->
+                <div class="bg-gray-50 rounded-lg p-6 mb-6">
+                    <h4 class="font-bold text-lg mb-4">Order Summary</h4>
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span>Plan:</span>
+                            <span class="font-bold" id="summaryPlanName">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Billing Cycle:</span>
+                            <span class="font-bold" id="summaryBillingCycle">Monthly</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Current Balance:</span>
+                            <span class="font-bold text-green-600">${{ user.balance }}</span>
+                        </div>
+                        <hr class="my-2">
+                        <div class="flex justify-between text-lg">
+                            <span class="font-bold">Total:</span>
+                            <span class="font-bold text-blue-600 text-2xl" id="summaryTotal">$0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error Message -->
+                <div id="orderError" class="hidden mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"></div>
+
+                <!-- Submit Button -->
+                <button type="submit" id="orderSubmitBtn"
+                        class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-lg font-bold text-lg hover:from-blue-700 hover:to-indigo-700 transition-all transform hover:scale-105 shadow-lg">
+                    <i class="fas fa-credit-card mr-2"></i> Proceed to Payment
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .billing-btn {
+        color: #4B5563;
+    }
+    .billing-btn.active {
+        background: linear-gradient(to right, #2563eb, #4f46e5);
+        color: white;
+    }
+</style>
+
+<script>
+let currentBillingCycle = 'monthly';
+let selectedPlan = null;
+
+function changeBillingCycle(cycle) {
+    currentBillingCycle = cycle;
+    
+    // Update button styles
+    document.querySelectorAll('.billing-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(cycle + 'Btn').classList.add('active');
+    
+    // Update all plan prices
+    document.querySelectorAll('.plan-card').forEach(card => {
+        const priceEl = card.querySelector('.plan-price');
+        const price = card.dataset[cycle];
+        priceEl.textContent = price;
+    });
+}
+
+function orderPlan(planId, planName) {
+    {% if not user.is_authenticated %}
+        window.location.href = '/auth/login/?next=/plans/';
+        return;
+    {% endif %}
+    
+    selectedPlan = planId;
+    const card = document.querySelector(`[data-plan-id="${planId}"]`);
+    
+    document.getElementById('orderPlanId').value = planId;
+    document.getElementById('modalPlanName').textContent = planName;
+    document.getElementById('summaryPlanName').textContent = planName;
+    
+    // Set prices in modal
+    document.getElementById('monthlyPrice').textContent = '$' + card.dataset.monthly;
+    document.getElementById('quarterlyPrice').textContent = '$' + card.dataset.quarterly;
+    document.getElementById('annuallyPrice').textContent = '$' + card.dataset.annually;
+    document.getElementById('summaryTotal').textContent = '$' + card.dataset.monthly;
+    
+    document.getElementById('orderModal').classList.remove('hidden');
+}
+
+function closeOrderModal() {
+    document.getElementById('orderModal').classList.add('hidden');
+}
+
+// Update summary when billing cycle changes
+document.addEventListener('DOMContentLoaded', function() {
+    const billingInputs = document.querySelectorAll('input[name="billing_cycle"]');
+    billingInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            const cycle = this.value;
+            document.getElementById('summaryBillingCycle').textContent = 
+                cycle.charAt(0).toUpperCase() + cycle.slice(1);
+            
+            const card = document.querySelector(`[data-plan-id="${selectedPlan}"]`);
+            if (card) {
+                const price = card.dataset[cycle];
+                document.getElementById('summaryTotal').textContent = '$' + price;
+            }
+        });
+    });
+});
+
+// Handle form submission
+document.getElementById('orderForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const errorDiv = document.getElementById('orderError');
+    const submitBtn = document.getElementById('orderSubmitBtn');
+    
+    errorDiv.classList.add('hidden');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
+    
+    const formData = {
+        plan_id: document.getElementById('orderPlanId').value,
+        billing_cycle: document.querySelector('input[name="billing_cycle"]:checked').value,
+        domain: document.getElementById('domain').value
+    };
+    
+    try {
+        const response = await fetch('/api/services/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            // Success - redirect to payment page
+            window.location.href = `/dashboard/invoices/?new_invoice=${data.invoice.id}`;
+        } else {
+            errorDiv.textContent = data.error || 'Failed to create service. Please try again.';
+            errorDiv.classList.remove('hidden');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-credit-card mr-2"></i> Proceed to Payment';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        errorDiv.textContent = 'An error occurred. Please try again.';
+        errorDiv.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-credit-card mr-2"></i> Proceed to Payment';
+    }
+});
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}
