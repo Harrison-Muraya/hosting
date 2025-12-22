@@ -16,36 +16,62 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
-from core.views import *
+from core import views as core_views
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from rest_framework import permissions
 
+# Swagger/API Documentation
 schema_view = get_schema_view(
     openapi.Info(
         title="Hosting Automation API",
         default_version='v1',
-        description="API for hosting automation platform",
+        description="Complete API for hosting automation platform",
+        contact=openapi.Contact(email="support@hostpro.com"),
+        license=openapi.License(name="MIT License"),
     ),
     public=True,
     permission_classes=[permissions.AllowAny],
 )
 
-
+# REST Framework Router
 router = DefaultRouter()
-router.register(r'plans', PlanViewSet, basename='plan')
-router.register(r'services', ServiceViewSet, basename='service')
-router.register(r'transactions', TransactionViewSet, basename='transaction')
-router.register(r'invoices', InvoiceViewSet, basename='invoice')
+router.register(r'plans', core_views.PlanViewSet, basename='plan')
+router.register(r'services', core_views.ServiceViewSet, basename='service')
+router.register(r'transactions', core_views.TransactionViewSet, basename='transaction')
+router.register(r'invoices', core_views.InvoiceViewSet, basename='invoice')
 
 urlpatterns = [
+    # Django Admin
     path('admin/', admin.site.urls),
+    
+    # API Routes
     path('api/', include(router.urls)),
-    path('api/register/', register, name='register'),
-    path('api/login/', login, name='login'),
-    path('api/webhooks/mpesa/', mpesa_callback, name='mpesa_callback'),
-    path('api/webhooks/paypal/', paypal_webhook, name='paypal_webhook'),
+    
+    # Authentication API
+    path('api/register/', core_views.register, name='api_register'),
+    path('api/login/', core_views.login, name='api_login'),
+    path('api/logout/', core_views.logout, name='api_logout'),
+    path('api/profile/', core_views.user_profile, name='api_user_profile'),
+    path('api/profile/update/', core_views.update_profile, name='api_update_profile'),
+    path('api/change-password/', core_views.change_password, name='api_change_password'),
+    
+    # Webhooks
+    path('api/webhooks/mpesa/', core_views.mpesa_callback, name='mpesa_callback'),
+    path('api/webhooks/paypal/', core_views.paypal_webhook, name='paypal_webhook'),
+    
+    # API Documentation
     path('api/docs/', schema_view.with_ui('swagger', cache_timeout=0), name='api_docs'),
+    path('api/redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='api_redoc'),
+    
+    # Dashboard/Frontend Views
     path('', include('dashboard.urls')),
 ]
+
+# Serve media files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

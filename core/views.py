@@ -2,43 +2,199 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
 from django.utils import timezone
-from core.models import User, Plan, Service
+from core.models import Plan, Service
 from payments.models import Transaction, Invoice
 from core.serializers import *
 from payments.mpesa import MPesaClient
 from payments.paypal import PayPalClient
-from core.tasks import create_vm_task, reactivate_service_task
+from core.tasks import create_vm_task, reactivate_service_task, send_welcome_email
 import uuid
+
+User = get_user_model()
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def register(request):
+    """
+    Register a new user
+    
+    POST /api/register/
+    {
+        "username": "johndoe",
+        "email": "john@example.com",
+        "password": "SecurePass123!",
+        "password2": "SecurePass123!",
+        "first_name": "John",
+        "last_name": "Doe",
+        "phone_number": "254700000000"
+    }
+    """
     serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
         token, _ = Token.objects.get_or_create(user=user)
+        
+        # Send welcome email (async)
+        send_welcome_email.delay(user.id)
+        
         return Response({
+            'success': True,
+            'message': 'Registration successful! Welcome to our platform.',
             'token': token.key,
             'user': UserSerializer(user).data
         }, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    return Response({
+        'success': False,
+        'errors': serializer.errors
+    }, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def login(request):
-    username = request.data.get('username')
-    password = request.data.get('password')
+    """
+    Login user
+    
+    POST /api/login/
+    {
+        "username": "johndoe",
+        "password": "SecurePass123!"
+    }
+    """
+    serializer = UserLoginSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    username = serializer.validated_data['username']
+    password = serializer.validated_data['password']
     
     user = authenticate(username=username, password=password)
+    
     if user:
         token, _ = Token.objects.get_or_create(user=user)
         return Response({
+            'success': True,
+            'message': 'Login successful!',
             'token': token.key,
             'user': UserSerializer(user).data
         })
-    return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+    
+    return Response({
+        'success': False,
+        'message': 'Invalid credentials. Please check your username and password.'
+    }, status=status.HTTP_401_UNAUTHORIZED)
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def logout(request):
+    """
+    Logout user by deleting token
+    
+    POST /api/logout/
+    Headers: Authorization: Token <token>
+    """
+    try:
+        request.user.auth_token.delete()
+        return Response({
+            'success': True,
+            'message': 'Successfully logged out.'
+        })
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def user_profile(request):
+    """
+    Get current user profile
+    
+    GET /api/profile/
+    Headers: Authorization: Token <token>
+    """
+    serializer = UserSerializer(request.user)
+    return Response({
+        'success': True,
+        'user': serializer.data
+    })
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([permissions.IsAuthenticated])
+def update_profile(request):
+    """
+    Update user profile
+    
+    PUT/PATCH /api/profile/update/
+    Headers: Authorization: Token <token>
+    {
+        "first_name": "John",
+        "last_name": "Doe",
+        "phone_number": "254700000000"
+    }
+    """
+    serializer = UserSerializer(request.user, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({
+            'success': True,
+            'message': 'Profile updated successfully!',
+            'user': serializer.data
+        })
+    return Response({
+        'success': False,
+        'errors': serializer.errors
+    }, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def change_password(request):
+    """
+    Change user password
+    
+    POST /api/change-password/
+    Headers: Authorization: Token <token>
+    {
+        "old_password": "OldPass123!",
+        "new_password": "NewPass123!",
+        "new_password2": "NewPass123!"
+    }
+    """
+    serializer = ChangePasswordSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    user = request.user
+    
+    # Check old password
+    if not user.check_password(serializer.validated_data['old_password']):
+        return Response({
+            'success': False,
+            'message': 'Old password is incorrect.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Set new password
+    user.set_password(serializer.validated_data['new_password'])
+    user.save()
+    
+    # Update token
+    Token.objects.filter(user=user).delete()
+    token = Token.objects.create(user=user)
+    
+    return Response({
+        'success': True,
+        'message': 'Password changed successfully!',
+        'token': token.key
+    })
 
 class PlanViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Plan.objects.filter(is_active=True)

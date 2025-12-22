@@ -3,10 +3,59 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
-from core.models import Service, User
+from core.models import Service
+from django.contrib.auth import get_user_model
 from vms.proxmox import ProxmoxManager
 from payments.models import Invoice, Transaction
 import uuid
+
+User = get_user_model()
+
+@shared_task
+def send_welcome_email(user_id):
+    """Send welcome email to new user"""
+    try:
+        user = User.objects.get(id=user_id)
+        
+        subject = 'Welcome to HostPro!'
+        message = f"""
+        Hello {user.first_name}!
+        
+        Welcome to HostPro - Your Professional Hosting Solution!
+        
+        Thank you for registering with us. Your account has been successfully created.
+        
+        Account Details:
+        - Username: {user.username}
+        - Email: {user.email}
+        - Account Balance: ${user.balance}
+        
+        Getting Started:
+        1. Browse our hosting plans
+        2. Select a plan that suits your needs
+        3. Make payment via M-Pesa or PayPal
+        4. Your VM will be deployed automatically
+        
+        Need help? Contact our support team anytime.
+        
+        Best regards,
+        The HostPro Team
+        """
+        
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [user.email],
+            fail_silently=False,
+        )
+        
+        return {'status': 'success', 'message': f'Welcome email sent to {user.email}'}
+    except User.DoesNotExist:
+        return {'status': 'error', 'message': 'User not found'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+    
 
 @shared_task
 def create_vm_task(service_id):
