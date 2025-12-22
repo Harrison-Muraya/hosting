@@ -129,6 +129,24 @@
             }
         }
 
+        // get CSRF token from cookies
+        // Get CSRF token
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Handle form submission
         const form = document.getElementById('loginForm');
         const errorDiv = document.getElementById('errorMessage');
         const submitBtn = document.getElementById('submitBtn');
@@ -150,6 +168,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
                     },
                     body: JSON.stringify(formData)
                 });
@@ -157,12 +176,17 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    // Store token in localStorage
+                    // Store token and user info
                     localStorage.setItem('authToken', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+
+                    window.location.href = data.redirect_url || '/dashboard/';
                     
-                    // Redirect to dashboard
-                    window.location.href = '/dashboard/';
-    
+                    // Set token in cookie for Django session
+                    // document.cookie = `authToken=${data.token}; path=/; max-age=86400`;
+                    
+                    // Redirect immediately to dashboard
+                    // window.location.href = '/dashboard/';
                 } else {
                     errorDiv.textContent = data.message || 'Login failed. Please try again.';
                     errorDiv.classList.remove('hidden');

@@ -2,8 +2,9 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
-from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth import authenticate, login as django_login, logout as django_logout, get_user_model
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from core.models import Plan, Service
 from payments.models import Transaction, Invoice
 from core.serializers import *
@@ -16,25 +17,18 @@ User = get_user_model()
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@csrf_exempt
 def register(request):
     """
-    Register a new user
-    
-    POST /api/register/
-    {
-        "username": "johndoe",
-        "email": "john@example.com",
-        "password": "SecurePass123!",
-        "password2": "SecurePass123!",
-        "first_name": "John",
-        "last_name": "Doe",
-        "phone_number": "254700000000"
-    }
+    Register a new user with automatic login
     """
     serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
         token, _ = Token.objects.get_or_create(user=user)
+        
+        # Log the user in with Django session
+        django_login(request, user, backend='django.contrib.auth.backends.ModelBackend')
         
         # Send welcome email (async)
         send_welcome_email.delay(user.id)
@@ -43,7 +37,8 @@ def register(request):
             'success': True,
             'message': 'Registration successful! Welcome to our platform.',
             'token': token.key,
-            'user': UserSerializer(user).data
+            'user': UserSerializer(user).data,
+            'redirect_url': '/dashboard/'
         }, status=status.HTTP_201_CREATED)
     
     return Response({
@@ -53,15 +48,10 @@ def register(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@csrf_exempt
 def login(request):
     """
-    Login user
-    
-    POST /api/login/
-    {
-        "username": "johndoe",
-        "password": "SecurePass123!"
-    }
+    Login user with Django session
     """
     serializer = UserLoginSerializer(data=request.data)
     if not serializer.is_valid():
@@ -73,15 +63,20 @@ def login(request):
     username = serializer.validated_data['username']
     password = serializer.validated_data['password']
     
-    user = authenticate(username=username, password=password)
+    user = authenticate(request, username=username, password=password)
     
     if user:
+        # Log the user in with Django session
+        django_login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+        
         token, _ = Token.objects.get_or_create(user=user)
+        
         return Response({
             'success': True,
             'message': 'Login successful!',
             'token': token.key,
-            'user': UserSerializer(user).data
+            'user': UserSerializer(user).data,
+            'redirect_url': '/dashboard/'
         })
     
     return Response({
@@ -89,20 +84,25 @@ def login(request):
         'message': 'Invalid credentials. Please check your username and password.'
     }, status=status.HTTP_401_UNAUTHORIZED)
 
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
+@api_view(['POST', 'GET'])
+@permission_classes([permissions.AllowAny])
 def logout(request):
     """
-    Logout user by deleting token
-    
-    POST /api/logout/
-    Headers: Authorization: Token <token>
+    Logout user by deleting token and clearing session
     """
     try:
-        request.user.auth_token.delete()
+        if request.user.is_authenticated:
+            # Delete token if exists
+            if hasattr(request.user, 'auth_token'):
+                request.user.auth_token.delete()
+            
+            # Django logout (clears session)
+            django_logout(request)
+        
         return Response({
             'success': True,
-            'message': 'Successfully logged out.'
+            'message': 'Successfully logged out.',
+            'redirect_url': '/dashboard/'
         })
     except Exception as e:
         return Response({
@@ -113,12 +113,7 @@ def logout(request):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def user_profile(request):
-    """
-    Get current user profile
-    
-    GET /api/profile/
-    Headers: Authorization: Token <token>
-    """
+    """Get current user profile"""
     serializer = UserSerializer(request.user)
     return Response({
         'success': True,
@@ -128,17 +123,7 @@ def user_profile(request):
 @api_view(['PUT', 'PATCH'])
 @permission_classes([permissions.IsAuthenticated])
 def update_profile(request):
-    """
-    Update user profile
-    
-    PUT/PATCH /api/profile/update/
-    Headers: Authorization: Token <token>
-    {
-        "first_name": "John",
-        "last_name": "Doe",
-        "phone_number": "254700000000"
-    }
-    """
+    """Update user profile"""
     serializer = UserSerializer(request.user, data=request.data, partial=True)
     if serializer.is_valid():
         serializer.save()
@@ -155,17 +140,7 @@ def update_profile(request):
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def change_password(request):
-    """
-    Change user password
-    
-    POST /api/change-password/
-    Headers: Authorization: Token <token>
-    {
-        "old_password": "OldPass123!",
-        "new_password": "NewPass123!",
-        "new_password2": "NewPass123!"
-    }
-    """
+    """Change user password"""
     serializer = ChangePasswordSerializer(data=request.data)
     if not serializer.is_valid():
         return Response({
@@ -175,18 +150,15 @@ def change_password(request):
     
     user = request.user
     
-    # Check old password
     if not user.check_password(serializer.validated_data['old_password']):
         return Response({
             'success': False,
             'message': 'Old password is incorrect.'
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # Set new password
     user.set_password(serializer.validated_data['new_password'])
     user.save()
     
-    # Update token
     Token.objects.filter(user=user).delete()
     token = Token.objects.create(user=user)
     

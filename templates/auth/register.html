@@ -214,6 +214,22 @@
             }
         }
 
+        // Get CSRF token
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
         // Form submission
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -238,6 +254,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
                     },
                     body: JSON.stringify(formData)
                 });
@@ -245,16 +262,22 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    successDiv.textContent = data.message;
+                    successDiv.textContent = data.message + ' Redirecting to dashboard...';
                     successDiv.classList.remove('hidden');
                     
-                    // Store token
+                    // Store token and user info
                     localStorage.setItem('authToken', data.token);
-                    
-                    // Redirect to dashboard after 2 seconds
+                    localStorage.setItem('user', JSON.stringify(data.user));
+
                     setTimeout(() => {
-                        window.location.href = '/dashboard/';
+                        window.location.href = data.redirect_url || '/dashboard/';
                     }, 2000);
+                    
+                    // Set token in cookie for Django session
+                    // document.cookie = `authToken=${data.token}; path=/; max-age=86400`;
+                    
+                    // Redirect immediately to dashboard
+                    // window.location.href = '/dashboard/';
                 } else {
                     let errorMsg = 'Registration failed. Please check the following:\n';
                     for (const [field, errors] of Object.entries(data.errors)) {
