@@ -1,0 +1,511 @@
+{% extends 'base.html' %}
+
+{% block title %}Pay Invoice - HostPro{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Back Button -->
+    <div class="mb-6">
+        <a href="/dashboard/invoices/" class="text-blue-600 hover:text-blue-800 flex items-center">
+            <i class="fas fa-arrow-left mr-2"></i> Back to Invoices
+        </a>
+    </div>
+
+    <!-- Invoice Details Card -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
+            <h1 class="text-3xl font-bold">
+                <i class="fas fa-file-invoice-dollar mr-2"></i> Invoice Payment
+            </h1>
+        </div>
+
+        <div class="p-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <p class="text-sm text-gray-500 mb-1">Invoice Number</p>
+                    <p class="text-2xl font-bold">{{ invoice.invoice_number }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500 mb-1">Amount Due</p>
+                    <p class="text-3xl font-bold text-blue-600">${{ invoice.amount }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500 mb-1">Due Date</p>
+                    <p class="font-bold">{{ invoice.due_date|date:"F d, Y" }}</p>
+                    {% if invoice.due_date < now %}
+                    <span class="text-red-600 text-sm">
+                        <i class="fas fa-exclamation-triangle"></i> Overdue
+                    </span>
+                    {% endif %}
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500 mb-1">Status</p>
+                    <span class="px-3 py-1 rounded-full text-sm font-medium {% if invoice.status == 'paid' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                        {{ invoice.status|upper }}
+                    </span>
+                </div>
+                <div class="md:col-span-2">
+                    <p class="text-sm text-gray-500 mb-1">Description</p>
+                    <p class="font-bold">{{ invoice.description }}</p>
+                </div>
+                {% if invoice.service %}
+                <div class="md:col-span-2">
+                    <p class="text-sm text-gray-500 mb-1">Service</p>
+                    <p class="font-bold">{{ invoice.service.plan.name }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if invoice.status == 'unpaid' %}
+            <!-- Current Balance -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-700">Your Current Balance:</span>
+                    <span class="text-2xl font-bold text-green-600">${{ user.balance }}</span>
+                </div>
+            </div>
+
+            <!-- Payment Methods -->
+            <div class="space-y-4">
+                <h3 class="text-xl font-bold mb-4">Select Payment Method</h3>
+
+                <!-- Account Balance Payment -->
+                <div class="border-2 border-gray-200 rounded-lg p-6 hover:border-blue-500 transition cursor-pointer" onclick="selectPaymentMethod('balance')">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="bg-purple-100 p-3 rounded-lg mr-4">
+                                <i class="fas fa-wallet text-purple-600 text-2xl"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-lg">Account Balance</h4>
+                                <p class="text-sm text-gray-600">Pay instantly from your account balance</p>
+                                <p class="text-sm font-bold text-green-600 mt-1">Available: ${{ user.balance }}</p>
+                            </div>
+                        </div>
+                        <div>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- M-Pesa Payment -->
+                <div class="border-2 border-gray-200 rounded-lg p-6 hover:border-blue-500 transition cursor-pointer" onclick="selectPaymentMethod('mpesa')">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="bg-green-100 p-3 rounded-lg mr-4">
+                                <i class="fas fa-mobile-alt text-green-600 text-2xl"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-lg">M-Pesa</h4>
+                                <p class="text-sm text-gray-600">Pay with M-Pesa mobile money</p>
+                                <p class="text-sm text-gray-500 mt-1">Supports Safaricom M-Pesa</p>
+                            </div>
+                        </div>
+                        <div>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PayPal Payment -->
+                <div class="border-2 border-gray-200 rounded-lg p-6 hover:border-blue-500 transition cursor-pointer" onclick="selectPaymentMethod('paypal')">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="bg-blue-100 p-3 rounded-lg mr-4">
+                                <i class="fab fa-paypal text-blue-600 text-2xl"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-lg">PayPal</h4>
+                                <p class="text-sm text-gray-600">Pay securely with PayPal</p>
+                                <p class="text-sm text-gray-500 mt-1">Credit/Debit cards accepted</p>
+                            </div>
+                        </div>
+                        <div>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="bg-green-50 border border-green-200 rounded-lg p-6">
+                <div class="flex items-center">
+                    <i class="fas fa-check-circle text-green-600 text-3xl mr-4"></i>
+                    <div>
+                        <h4 class="font-bold text-lg text-green-800">Invoice Paid</h4>
+                        <p class="text-green-700">This invoice has been paid on {{ invoice.paid_at|date:"F d, Y" }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Account Balance Payment Modal -->
+<div id="balanceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+        <div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6 rounded-t-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-2xl font-bold">
+                    <i class="fas fa-wallet mr-2"></i> Pay with Balance
+                </h3>
+                <button onclick="closeModal()" class="text-white hover:text-gray-200">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+        </div>
+        <div class="p-6">
+            <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                <div class="flex justify-between mb-2">
+                    <span>Invoice Amount:</span>
+                    <span class="font-bold">${{ invoice.amount }}</span>
+                </div>
+                <div class="flex justify-between mb-2">
+                    <span>Current Balance:</span>
+                    <span class="font-bold text-green-600">${{ user.balance }}</span>
+                </div>
+                <hr class="my-2">
+                <div class="flex justify-between">
+                    <span class="font-bold">After Payment:</span>
+                    <span class="font-bold text-blue-600">$<span id="afterBalance"></span></span>
+                </div>
+            </div>
+            
+            {% if user.balance >= invoice.amount %}
+            <div id="balanceError" class="hidden mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"></div>
+            <button onclick="payWithBalance()" id="balancePayBtn" class="w-full bg-gradient-to-r from-purple-600 to-purple-700 text-white py-4 rounded-lg font-bold text-lg hover:from-purple-700 hover:to-purple-800 transition">
+                <i class="fas fa-check-circle mr-2"></i> Confirm Payment
+            </button>
+            {% else %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                <i class="fas fa-exclamation-triangle mr-2"></i> Insufficient balance. Please top up your account or use another payment method.
+            </div>
+            <button disabled class="w-full bg-gray-400 text-white py-4 rounded-lg font-bold text-lg cursor-not-allowed">
+                Insufficient Balance
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- M-Pesa Payment Modal -->
+<div id="mpesaModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+        <div class="bg-gradient-to-r from-green-600 to-green-700 text-white p-6 rounded-t-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-2xl font-bold">
+                    <i class="fas fa-mobile-alt mr-2"></i> M-Pesa Payment
+                </h3>
+                <button onclick="closeModal()" class="text-white hover:text-gray-200">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+        </div>
+        <div class="p-6">
+            <form id="mpesaForm">
+                <div class="mb-6">
+                    <label for="mpesaPhone" class="block text-sm font-bold text-gray-700 mb-2">
+                        M-Pesa Phone Number
+                    </label>
+                    <input type="tel" id="mpesaPhone" name="phone_number" 
+                           value="{{ user.phone_number }}"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                           placeholder="254700000000" required>
+                    <p class="text-sm text-gray-500 mt-1">Format: 254XXXXXXXXX</p>
+                </div>
+
+                <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                    <div class="flex justify-between">
+                        <span>Amount to Pay:</span>
+                        <span class="font-bold text-2xl text-green-600">${{ invoice.amount }}</span>
+                    </div>
+                </div>
+
+                <div id="mpesaError" class="hidden mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"></div>
+                
+                <button type="submit" id="mpesaPayBtn" class="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-4 rounded-lg font-bold text-lg hover:from-green-700 hover:to-green-800 transition">
+                    <i class="fas fa-mobile-alt mr-2"></i> Send STK Push
+                </button>
+            </form>
+
+            <div id="mpesaWaiting" class="hidden text-center py-6">
+                <i class="fas fa-mobile-alt text-green-600 text-6xl mb-4 animate-pulse"></i>
+                <h4 class="text-xl font-bold mb-2">Check Your Phone</h4>
+                <p class="text-gray-600">Enter your M-Pesa PIN to complete payment</p>
+                <div class="mt-4">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PayPal Payment Modal -->
+<div id="paypalModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-t-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-2xl font-bold">
+                    <i class="fab fa-paypal mr-2"></i> PayPal Payment
+                </h3>
+                <button onclick="closeModal()" class="text-white hover:text-gray-200">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+        </div>
+        <div class="p-6">
+            <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                <div class="flex justify-between">
+                    <span>Amount to Pay:</span>
+                    <span class="font-bold text-2xl text-blue-600">${{ invoice.amount }}</span>
+                </div>
+            </div>
+
+            <div id="paypalError" class="hidden mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"></div>
+            
+            <div id="paypal-button-container"></div>
+            
+            <p class="text-sm text-gray-500 text-center mt-4">
+                You will be redirected to PayPal to complete your payment securely.
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+// Set user balance and invoice amount as JavaScript variables
+const userBalance = parseFloat('{{ user.balance }}');
+const invoiceAmount = parseFloat('{{ invoice.amount }}');
+
+// Calculate and display after balance
+document.addEventListener('DOMContentLoaded', function() {
+    const afterBalanceEl = document.getElementById('afterBalance');
+    if (afterBalanceEl) {
+        const afterBalance = (userBalance - invoiceAmount).toFixed(2);
+        afterBalanceEl.textContent = afterBalance;
+    }
+});
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function selectPaymentMethod(method) {
+    closeModal();
+    
+    if (method === 'balance') {
+        document.getElementById('balanceModal').classList.remove('hidden');
+    } else if (method === 'mpesa') {
+        document.getElementById('mpesaModal').classList.remove('hidden');
+    } else if (method === 'paypal') {
+        document.getElementById('paypalModal').classList.remove('hidden');
+        initPayPal();
+    }
+}
+
+function closeModal() {
+    document.getElementById('balanceModal').classList.add('hidden');
+    document.getElementById('mpesaModal').classList.add('hidden');
+    document.getElementById('paypalModal').classList.add('hidden');
+}
+
+// Account Balance Payment
+async function payWithBalance() {
+    const btn = document.getElementById('balancePayBtn');
+    const errorDiv = document.getElementById('balanceError');
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
+    errorDiv.classList.add('hidden');
+    
+    try {
+        const response = await fetch('/api/invoices/{{ invoice.id }}/pay_with_balance/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            credentials: 'same-origin'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            // Show success message
+            alert('Payment successful! Your service is being deployed...');
+            window.location.href = '/dashboard/';
+        } else {
+            errorDiv.textContent = data.message || 'Payment failed. Please try again.';
+            errorDiv.classList.remove('hidden');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check-circle mr-2"></i> Confirm Payment';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        errorDiv.textContent = 'An error occurred. Please try again.';
+        errorDiv.classList.remove('hidden');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check-circle mr-2"></i> Confirm Payment';
+    }
+}
+
+// M-Pesa Payment
+document.getElementById('mpesaForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const btn = document.getElementById('mpesaPayBtn');
+    const errorDiv = document.getElementById('mpesaError');
+    const form = document.getElementById('mpesaForm');
+    const waiting = document.getElementById('mpesaWaiting');
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Initiating...';
+    errorDiv.classList.add('hidden');
+    
+    const phoneNumber = document.getElementById('mpesaPhone').value;
+    
+    try {
+        const response = await fetch('/api/transactions/mpesa_payment/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                phone_number: phoneNumber,
+                amount: {{ invoice.amount }},
+                invoice_id: {{ invoice.id }}
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            // Hide form, show waiting message
+            form.classList.add('hidden');
+            waiting.classList.remove('hidden');
+            
+            // Poll for payment status
+            pollPaymentStatus(data.transaction.id);
+        } else {
+            errorDiv.textContent = data.error || 'Failed to initiate M-Pesa payment';
+            errorDiv.classList.remove('hidden');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-mobile-alt mr-2"></i> Send STK Push';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        errorDiv.textContent = 'An error occurred. Please try again.';
+        errorDiv.classList.remove('hidden');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-mobile-alt mr-2"></i> Send STK Push';
+    }
+});
+
+function pollPaymentStatus(transactionId) {
+    let attempts = 0;
+    const maxAttempts = 60; // 2 minutes
+    
+    const interval = setInterval(async () => {
+        attempts++;
+        
+        try {
+            const response = await fetch(`/api/transactions/${transactionId}/`, {
+                credentials: 'same-origin'
+            });
+            const data = await response.json();
+            
+            if (data.status === 'completed') {
+                clearInterval(interval);
+                alert('Payment successful! Your service is being deployed...');
+                window.location.href = '/dashboard/';
+            } else if (data.status === 'failed' || attempts >= maxAttempts) {
+                clearInterval(interval);
+                alert('Payment failed or timed out. Please try again.');
+                location.reload();
+            }
+        } catch (error) {
+            console.error('Error checking payment status:', error);
+        }
+    }, 2000); // Check every 2 seconds
+}
+
+// PayPal Integration
+function initPayPal() {
+    const container = document.getElementById('paypal-button-container');
+    container.innerHTML = '<button onclick="processPayPal()" class="w-full bg-blue-600 text-white py-4 rounded-lg font-bold hover:bg-blue-700 transition-all"><i class="fab fa-paypal mr-2"></i> Continue to PayPal</button>';
+}
+
+async function processPayPal() {
+    const errorDiv = document.getElementById('paypalError');
+    const btn = event.target;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
+    errorDiv.classList.add('hidden');
+    
+    try {
+        const response = await fetch('/api/transactions/paypal_payment/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                amount: invoiceAmount,
+                invoice_id: {{ invoice.id }},
+                return_url: window.location.origin + '/dashboard/',
+                cancel_url: window.location.href
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            // Check if PayPal integration is configured
+            if (data.paypal_response && data.paypal_response.links) {
+                const approveLink = data.paypal_response.links.find(link => link.rel === 'approve');
+                if (approveLink) {
+                    window.location.href = approveLink.href;
+                } else {
+                    throw new Error('PayPal approval link not found');
+                }
+            } else {
+                // PayPal not configured - show friendly message
+                errorDiv.innerHTML = `
+                    <div>
+                        <p class="font-bold mb-2">PayPal Integration Not Configured</p>
+                        <p class="text-sm">PayPal payment is not available at the moment. Please use M-Pesa or Account Balance instead.</p>
+                        <p class="text-sm mt-2">Administrator: Configure PayPal credentials in settings.</p>
+                    </div>
+                `;
+                errorDiv.classList.remove('hidden');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fab fa-paypal mr-2"></i> Continue to PayPal';
+            }
+        } else {
+            throw new Error(data.error || 'Failed to create PayPal order');
+        }
+    } catch (error) {
+        console.error('PayPal Error:', error);
+        errorDiv.textContent = error.message || 'Failed to process PayPal payment. Please try another payment method.';
+        errorDiv.classList.remove('hidden');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fab fa-paypal mr-2"></i> Continue to PayPal';
+    }
+}
+</script>
+{% endblock %}

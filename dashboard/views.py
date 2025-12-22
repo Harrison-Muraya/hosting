@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.db.models import Sum
 from core.models import Service, Plan, User
 from payments.models import Invoice, Transaction
+from payments.views import invoice_payment_page
 
 def home(request):
     """Home page with plans"""
@@ -23,6 +24,22 @@ def login_page(request):
     if request.user.is_authenticated:
         return redirect('user_dashboard')
     return render(request, 'auth/login.html')
+
+@login_required
+def invoices_list(request):
+    '''List all invoices'''
+    invoices = Invoice.objects.filter(user=request.user).select_related('service').order_by('-created_at')
+    
+    # Check for new invoice (after order)
+    new_invoice_id = request.GET.get('new_invoice')
+    new_invoice = None
+    if new_invoice_id:
+        new_invoice = invoices.filter(id=new_invoice_id).first()
+    
+    return render(request, 'dashboard/invoices.html', {
+        'invoices': invoices,
+        'new_invoice': new_invoice
+    })
 
 @login_required(login_url='/auth/login/')
 def user_dashboard(request):

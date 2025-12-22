@@ -1,6 +1,8 @@
 from django.urls import path
 from dashboard import views
 from core import admin_views
+from payments.views import invoice_payment_page
+
 
 urlpatterns = [
     # Public pages
@@ -17,6 +19,7 @@ urlpatterns = [
     path('dashboard/invoices/', views.invoices_list, name='invoices_list'),
     path('dashboard/transactions/', views.transactions_list, name='transactions_list'),
     path('dashboard/profile/', views.profile, name='profile'),
+    path('dashboard/invoices/<int:invoice_id>/pay/', invoice_payment_page, name='invoice_payment'),
     
     # Admin dashboard
     path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),

@@ -1,3 +1,6 @@
 from django.contrib import admin
+from core.models import Plan, Service, User
 
-# Register your models here.
+admin.site.register(Plan)
+admin.site.register(Service)
+admin.site.register(User)

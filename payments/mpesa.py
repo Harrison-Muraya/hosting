@@ -36,6 +36,7 @@ class MPesaClient:
             'Authorization': f'Bearer {access_token}',
             'Content-Type': 'application/json'
         }
+
         
         payload = {
             'BusinessShortCode': self.shortcode,

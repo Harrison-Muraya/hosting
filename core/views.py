@@ -10,8 +10,11 @@ from payments.models import Transaction, Invoice
 from core.serializers import *
 from payments.mpesa import MPesaClient
 from payments.paypal import PayPalClient
+from payments.views import pay_invoice_with_balance
 from core.tasks import create_vm_task, reactivate_service_task, send_welcome_email
 import uuid
+from datetime import timedelta
+
 
 User = get_user_model()
 
@@ -167,6 +170,19 @@ def change_password(request):
         'message': 'Password changed successfully!',
         'token': token.key
     })
+
+class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = InvoiceSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return Invoice.objects.all()
+        return Invoice.objects.filter(user=self.request.user)
+    
+    @action(detail=True, methods=['post'], url_path='pay_with_balance')
+    def pay_with_balance(self, request, pk=None):
+        return pay_invoice_with_balance(request, pk)
 
 class PlanViewSet(viewsets.ReadOnlyModelViewSet):
     """
