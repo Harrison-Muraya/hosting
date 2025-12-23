@@ -141,10 +141,12 @@ PAYPAL_CLIENT_SECRET = config('PAYPAL_CLIENT_SECRET', default='')
 PAYPAL_MODE = config('PAYPAL_MODE', default='sandbox')
 
 # Proxmox Configuration
-PROXMOX_HOST = config('PROXMOX_HOST', default='')
-PROXMOX_USER = config('PROXMOX_USER', default='')
+PROXMOX_HOST = config('PROXMOX_HOST', default='197.248.201.233')
+PROXMOX_USER = config('PROXMOX_USER', default='root@pam')
 PROXMOX_PASSWORD = config('PROXMOX_PASSWORD', default='')
 PROXMOX_NODE = config('PROXMOX_NODE', default='pve')
+PROXMOX_VERIFY_SSL = config('PROXMOX_VERIFY_SSL', default=False, cast=bool)
+PROXMOX_TEMPLATE_ID = config('PROXMOX_TEMPLATE_ID', default='', cast=int) if config('PROXMOX_TEMPLATE_ID', default='') else None
 
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')

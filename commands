@@ -66,11 +66,13 @@ python manage.py createsuperuser
 
 # Run server
 python manage.py runserver
+py manage.py runserver 192.168.100.8:8000
 
-
-# To run the command:
+@REM To populate hosting plans using the management command, use the following:
 python manage.py populate_plans
 
-# to run celery worker:
+@REM To run Celery worker (in a separate terminal):
 celery -A hosting worker -l info --pool=solo
 
+@REM To create a test VM using the management command, use the following:
+python manage.py create_test_vm --name test-vm --cores 1 --memory 1024 --disk 10 --delete  
