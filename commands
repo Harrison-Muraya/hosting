@@ -70,3 +70,7 @@ python manage.py runserver
 
 # To run the command:
 python manage.py populate_plans
+
+# to run celery worker:
+celery -A hosting worker -l info --pool=solo
+
