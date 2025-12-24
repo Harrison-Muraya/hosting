@@ -147,6 +147,8 @@ PROXMOX_PASSWORD = config('PROXMOX_PASSWORD', default='')
 PROXMOX_NODE = config('PROXMOX_NODE', default='pve')
 PROXMOX_VERIFY_SSL = config('PROXMOX_VERIFY_SSL', default=False, cast=bool)
 PROXMOX_TEMPLATE_ID = config('PROXMOX_TEMPLATE_ID', default='', cast=int) if config('PROXMOX_TEMPLATE_ID', default='') else None
+PROXMOX_TIMEOUT = 240 # API timeout in seconds
+PROXMOX_CLONE_WAIT = 240  # Wait time after cloning in seconds
 
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
