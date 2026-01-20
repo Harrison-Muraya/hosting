@@ -60,6 +60,95 @@ def send_welcome_email(user_id):
     
 
 @shared_task
+# def create_vm_task(service_id):
+#     """
+#     Create VM for a service - REAL IMPLEMENTATION
+#     """
+#     logger.info(f"Starting VM creation for service {service_id}")
+    
+#     try:
+#         service = Service.objects.get(id=service_id)
+#         proxmox = ProxmoxManager()
+        
+#         # Test Proxmox connection first
+#         connection_test = proxmox.test_connection()
+#         if connection_test['status'] != 'success':
+#             logger.error(f"Proxmox connection failed: {connection_test['message']}")
+#             service.status = 'suspended'
+#             service.save()
+#             send_vm_deployment_failed_email.delay(service_id, connection_test['message'])
+#             return {
+#                 'status': 'error',
+#                 'message': 'Proxmox connection failed'
+#             }
+        
+#         # Get next VM ID
+#         vmid = proxmox.get_next_vmid()
+#         vm_name = f"vps-{service.user.username}-{vmid}"
+        
+#         logger.info(f"Creating VM {vmid} for service {service_id}")
+#         logger.info(f"Specs: {service.plan.cpu_cores} cores, {service.plan.ram_mb}MB RAM, {service.plan.disk_gb}GB disk")
+        
+#         # Create the VM
+#         template_id = getattr(settings, 'PROXMOX_TEMPLATE_ID', None)
+#         result = proxmox.create_vm(
+#             vmid=vmid,
+#             name=vm_name,
+#             cores=service.plan.cpu_cores,
+#             memory=service.plan.ram_mb,
+#             disk=service.plan.disk_gb,
+#             template_id=template_id
+#         )
+        
+#         if result['status'] == 'success':
+#             # Generate credentials
+#             password = proxmox.generate_password()
+            
+#             # Update service
+#             service.vm_id = vmid
+#             service.ip_address = result.get('ip_address')
+#             service.username = 'root'
+#             service.password = password
+#             service.status = 'active'
+#             service.activated_at = timezone.now()
+#             service.save()
+            
+#             logger.info(f"VM {vmid} created successfully for service {service_id}")
+#             logger.info(f"IP Address: {service.ip_address}")
+            
+#             # Send email with credentials
+#             send_service_credentials_email.delay(service_id)
+            
+#             return {
+#                 'status': 'success',
+#                 'vmid': vmid,
+#                 'ip_address': service.ip_address,
+#                 'message': 'VM created successfully'
+#             }
+#         else:
+#             logger.error(f"VM creation failed for service {service_id}: {result['message']}")
+#             service.status = 'suspended'
+#             service.save()
+            
+#             # Send failure email
+#             send_vm_deployment_failed_email.delay(service_id, result['message'])
+            
+#             return result
+            
+#     except Service.DoesNotExist:
+#         logger.error(f"Service {service_id} not found")
+#         return {'status': 'error', 'message': 'Service not found'}
+#     except Exception as e:
+#         logger.error(f"Exception during VM creation for service {service_id}: {str(e)}")
+#         try:
+#             service = Service.objects.get(id=service_id)
+#             service.status = 'suspended'
+#             service.save()
+#             send_vm_deployment_failed_email.delay(service_id, str(e))
+#         except:
+#             pass
+#         return {'status': 'error', 'message': str(e)}
+    
 def create_vm_task(service_id):
     """
     Create VM for a service - REAL IMPLEMENTATION
@@ -70,26 +159,26 @@ def create_vm_task(service_id):
         service = Service.objects.get(id=service_id)
         proxmox = ProxmoxManager()
         
-        # Test Proxmox connection first
+        # Test connection
         connection_test = proxmox.test_connection()
         if connection_test['status'] != 'success':
             logger.error(f"Proxmox connection failed: {connection_test['message']}")
             service.status = 'suspended'
             service.save()
             send_vm_deployment_failed_email.delay(service_id, connection_test['message'])
-            return {
-                'status': 'error',
-                'message': 'Proxmox connection failed'
-            }
+            return {'status': 'error', 'message': 'Proxmox connection failed'}
         
         # Get next VM ID
         vmid = proxmox.get_next_vmid()
         vm_name = f"vps-{service.user.username}-{vmid}"
         
+        # Generate password BEFORE creating VM
+        password = proxmox.generate_password()
+        
         logger.info(f"Creating VM {vmid} for service {service_id}")
         logger.info(f"Specs: {service.plan.cpu_cores} cores, {service.plan.ram_mb}MB RAM, {service.plan.disk_gb}GB disk")
         
-        # Create the VM
+        # Create the VM with password
         template_id = getattr(settings, 'PROXMOX_TEMPLATE_ID', None)
         result = proxmox.create_vm(
             vmid=vmid,
@@ -97,18 +186,16 @@ def create_vm_task(service_id):
             cores=service.plan.cpu_cores,
             memory=service.plan.ram_mb,
             disk=service.plan.disk_gb,
-            template_id=template_id
+            template_id=template_id,
+            password=password  # Pass the password here
         )
         
         if result['status'] == 'success':
-            # Generate credentials
-            password = proxmox.generate_password()
-            
-            # Update service
+            # Update service with credentials
             service.vm_id = vmid
             service.ip_address = result.get('ip_address')
             service.username = 'root'
-            service.password = password
+            service.password = password  # Save the generated password
             service.status = 'active'
             service.activated_at = timezone.now()
             service.save()
@@ -129,10 +216,7 @@ def create_vm_task(service_id):
             logger.error(f"VM creation failed for service {service_id}: {result['message']}")
             service.status = 'suspended'
             service.save()
-            
-            # Send failure email
             send_vm_deployment_failed_email.delay(service_id, result['message'])
-            
             return result
             
     except Service.DoesNotExist:
@@ -148,7 +232,6 @@ def create_vm_task(service_id):
         except:
             pass
         return {'status': 'error', 'message': str(e)}
-    
 @shared_task
 def send_vm_deployment_failed_email(service_id, error_message):
     """Send email when VM deployment fails"""
