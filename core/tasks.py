@@ -1,5 +1,6 @@
 from celery import shared_task
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMultiAlternatives
+from django.template.loader import render_to_string
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
@@ -9,6 +10,8 @@ from vms.proxmox import ProxmoxManager
 from payments.models import Invoice, Transaction
 import uuid
 import logging
+
+
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -354,6 +357,80 @@ def send_renewal_reminder_email(service_id, invoice_id):
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
     
+# @shared_task
+# def send_service_credentials_email(service_id):
+#     """Send service credentials to user"""
+#     try:
+#         service = Service.objects.get(id=service_id)
+        
+#         subject = f'🎉 Your {service.plan.name} Service is Ready!'
+#         message = f"""
+# Hello {service.user.first_name}!
+
+# Great news! Your {service.plan.name} service has been successfully activated and deployed!
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🖥️  SERVICE DETAILS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# VM ID: {service.vm_id}
+# Plan: {service.plan.name}
+# Status: Active ✓
+
+# 📊 RESOURCES:
+# • CPU Cores: {service.plan.cpu_cores}
+# • RAM: {service.plan.ram_mb}MB
+# • Disk: {service.plan.disk_gb}GB SSD
+# • Bandwidth: {service.plan.bandwidth_gb}GB
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🔐 SSH ACCESS CREDENTIALS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# IP Address: {service.ip_address or 'Pending...'}
+# Username: {service.username}
+# Password: {service.password}
+
+# SSH Command:
+# ssh {service.username}@{service.ip_address}
+
+# ⚠️ IMPORTANT: Change your root password immediately after first login!
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 💰 BILLING INFORMATION
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Billing Cycle: {service.billing_cycle.title()}
+# Amount: ${service.price}
+# Next Due Date: {service.next_due_date.strftime('%B %d, %Y')}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# 📱 MANAGE YOUR SERVICE:
+# View your dashboard: {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://your-site.com'}/dashboard/
+
+# Need help? Contact our support team anytime!
+
+# Best regards,
+# The HostPro Team
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#         """
+        
+#         send_mail(
+#             subject,
+#             message,
+#             settings.DEFAULT_FROM_EMAIL,
+#             [service.user.email],
+#             fail_silently=False,
+#         )
+        
+#         logger.info(f"Credentials email sent for service {service_id}")
+#         return {'status': 'success'}
+#     except Exception as e:
+#         logger.error(f"Failed to send credentials email for service {service_id}: {str(e)}")
+#         return {'status': 'error', 'message': str(e)}
+
 @shared_task
 def send_service_credentials_email(service_id):
     """Send service credentials to user"""
@@ -361,67 +438,41 @@ def send_service_credentials_email(service_id):
         service = Service.objects.get(id=service_id)
         
         subject = f'🎉 Your {service.plan.name} Service is Ready!'
-        message = f"""
-Hello {service.user.first_name}!
+        from_email = settings.DEFAULT_FROM_EMAIL
+        to_email = [service.user.email]
 
-Great news! Your {service.plan.name} service has been successfully activated and deployed!
+        # context for email template
+        context = {
+            'name': service.user.first_name,
+            'plan_name': service.plan.name,
+            'vm_id': service.vm_id,
+            'ip_address': service.ip_address or 'Pending...',
+            'username': service.username,
+            'password': service.password,
+            'cpu': service.plan.cpu_cores,
+            'ram': service.plan.ram_mb,
+            'disk': service.plan.disk_gb,
+            'bandwidth': service.plan.bandwidth_gb,
+            'billing_cycle': service.billing_cycle.title(),
+            'amount': service.price,
+            'next_due_date': service.next_due_date.strftime('%B %d, %Y'),
+            'dashboard_url': f"{getattr(settings, 'SITE_URL', 'https://your-site.com')}/dashboard/",
+            'year': timezone.now().year, 
+        }
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🖥️  SERVICE DETAILS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # Render HTML template
+        html_content = render_to_string('emails/service_credentials.html', context)
 
-VM ID: {service.vm_id}
-Plan: {service.plan.name}
-Status: Active ✓
-
-📊 RESOURCES:
-• CPU Cores: {service.plan.cpu_cores}
-• RAM: {service.plan.ram_mb}MB
-• Disk: {service.plan.disk_gb}GB SSD
-• Bandwidth: {service.plan.bandwidth_gb}GB
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔐 SSH ACCESS CREDENTIALS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-IP Address: {service.ip_address or 'Pending...'}
-Username: {service.username}
-Password: {service.password}
-
-SSH Command:
-ssh {service.username}@{service.ip_address}
-
-⚠️ IMPORTANT: Change your root password immediately after first login!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💰 BILLING INFORMATION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Billing Cycle: {service.billing_cycle.title()}
-Amount: ${service.price}
-Next Due Date: {service.next_due_date.strftime('%B %d, %Y')}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📱 MANAGE YOUR SERVICE:
-View your dashboard: {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://your-site.com'}/dashboard/
-
-Need help? Contact our support team anytime!
-
-Best regards,
-The HostPro Team
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        """
+        text_content = f"Your {service.plan.name} service is ready. Please check your email for details."
         
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [service.user.email],
-            fail_silently=False,
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=from_email,
+            to=to_email
         )
-        
+        email.attach_alternative(html_content, "text/html")
+        email.send()
         logger.info(f"Credentials email sent for service {service_id}")
         return {'status': 'success'}
     except Exception as e:

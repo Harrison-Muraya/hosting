@@ -57,6 +57,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'hosting.urls'
+SITE_URL = config('SITE_URL', default='http://localhost:8000')
 
 TEMPLATES = [
     {

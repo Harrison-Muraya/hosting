@@ -10,7 +10,7 @@ class MPesaClient:
         self.shortcode = settings.MPESA_SHORTCODE
         self.passkey = settings.MPESA_PASSKEY
         self.callback_url = settings.MPESA_CALLBACK_URL
-        
+        print("Callback URL:", self.callback_url)
         if settings.MPESA_ENV == 'sandbox':
             self.base_url = 'https://sandbox.safaricom.co.ke'
         else:
