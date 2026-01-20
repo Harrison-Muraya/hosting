@@ -63,6 +63,45 @@ def send_welcome_email(user_id):
     
 
 @shared_task
+def send_welcome_email(user_id):
+    """Send welcome email to new user"""
+    try:
+        user = User.objects.get(id=user_id)
+        
+        subject = 'Welcome to HostPro!'
+
+        from_email = settings.DEFAULT_FROM_EMAIL
+        to_email = [user.email]
+
+        # context for email template
+        context = {
+            'name': user.first_name,
+            'email': user.email,
+            'username': user.username,
+            'year': timezone.now().year,
+            'balance': user.balance,
+        }
+
+        # Render HTML template
+        html_content = render_to_string('emails/welcome_email.html', context)
+        
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=html_content,
+            from_email=from_email,
+            to=to_email
+        )
+        email.attach_alternative(html_content, "text/html")
+        email.send()
+        
+        return {'status': 'success', 'message': f'Welcome email sent to {user.email}'}
+    except User.DoesNotExist:
+        return {'status': 'error', 'message': 'User not found'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}  
+
+
+@shared_task
 # def create_vm_task(service_id):
 #     """
 #     Create VM for a service - REAL IMPLEMENTATION
