@@ -232,6 +232,66 @@ def create_vm_task(service_id):
         return {'status': 'error', 'message': str(e)}
 
 # Send VM deployment failure email
+# @shared_task
+# def send_vm_deployment_failed_email(service_id, error_message):
+#     """Send email when VM deployment fails"""
+#     try:
+#         service = Service.objects.get(id=service_id)
+        
+#         subject = '⚠️ Service Deployment Issue'
+#         message = f"""
+# Hello {service.user.first_name},
+
+# We encountered an issue while deploying your {service.plan.name} service.
+
+# Error Details:
+# {error_message}
+
+# Our technical team has been notified and is working to resolve this issue.
+# We'll have your service up and running as soon as possible.
+
+# Your payment has been processed successfully, and your service will be activated
+# once the technical issue is resolved.
+
+# If you have any questions, please don't hesitate to contact our support team.
+
+# Best regards,
+# The HostPro Team
+#         """
+        
+#         send_mail(
+#             subject,
+#             message,
+#             settings.DEFAULT_FROM_EMAIL,
+#             [service.user.email],
+#             fail_silently=False,
+#         )
+        
+#         # Also notify admin
+#         if hasattr(settings, 'ADMIN_EMAIL'):
+#             admin_message = f"""
+# VM Deployment Failed:
+
+# Service ID: {service_id}
+# User: {service.user.username} ({service.user.email})
+# Plan: {service.plan.name}
+# Error: {error_message}
+
+# Please investigate and resolve.
+#             """
+#             send_mail(
+#                 f'[URGENT] VM Deployment Failed - Service {service_id}',
+#                 admin_message,
+#                 settings.DEFAULT_FROM_EMAIL,
+#                 [settings.ADMIN_EMAIL],
+#                 fail_silently=True,
+#             )
+        
+#         return {'status': 'success'}
+#     except Exception as e:
+#         logger.error(f"Failed to send deployment failure email: {str(e)}")
+#         return {'status': 'error', 'message': str(e)}
+
 @shared_task
 def send_vm_deployment_failed_email(service_id, error_message):
     """Send email when VM deployment fails"""
@@ -239,6 +299,7 @@ def send_vm_deployment_failed_email(service_id, error_message):
         service = Service.objects.get(id=service_id)
         
         subject = '⚠️ Service Deployment Issue'
+
         message = f"""
 Hello {service.user.first_name},
 
@@ -291,6 +352,7 @@ Please investigate and resolve.
     except Exception as e:
         logger.error(f"Failed to send deployment failure email: {str(e)}")
         return {'status': 'error', 'message': str(e)}
+
 
 # Check service renewals task
 @shared_task
@@ -505,6 +567,42 @@ def check_service_renewals():
         if service.next_due_date < timezone.now():
             suspend_service_task.delay(service.id)
 
+# @shared_task
+# def send_renewal_reminder_email(service_id, invoice_id):
+#     """Send renewal reminder email"""
+#     try:
+#         service = Service.objects.get(id=service_id)
+#         invoice = Invoice.objects.get(id=invoice_id)
+        
+#         subject = f'Service Renewal Due - {service.plan.name}'
+#         message = f"""
+#         Hello {service.user.first_name},
+        
+#         Your {service.plan.name} service is due for renewal.
+        
+#         Invoice: {invoice.invoice_number}
+#         Amount: ${invoice.amount}
+#         Due Date: {invoice.due_date.strftime('%Y-%m-%d')}
+        
+#         Please make payment to avoid service suspension.
+        
+#         Best regards,
+#         Hosting Team
+#         """
+        
+#         send_mail(
+#             subject,
+#             message,
+#             settings.DEFAULT_FROM_EMAIL,
+#             [service.user.email],
+#             fail_silently=False,
+#         )
+        
+#         return {'status': 'success'}
+#     except Exception as e:
+#         return {'status': 'error', 'message': str(e)}
+
+# send renewal reminder email
 @shared_task
 def send_renewal_reminder_email(service_id, invoice_id):
     """Send renewal reminder email"""
@@ -513,32 +611,34 @@ def send_renewal_reminder_email(service_id, invoice_id):
         invoice = Invoice.objects.get(id=invoice_id)
         
         subject = f'Service Renewal Due - {service.plan.name}'
-        message = f"""
-        Hello {service.user.first_name},
-        
-        Your {service.plan.name} service is due for renewal.
-        
-        Invoice: {invoice.invoice_number}
-        Amount: ${invoice.amount}
-        Due Date: {invoice.due_date.strftime('%Y-%m-%d')}
-        
-        Please make payment to avoid service suspension.
-        
-        Best regards,
-        Hosting Team
-        """
-        
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [service.user.email],
-            fail_silently=False,
+        to = [service.user.email]
+
+        context = {
+            'name': service.user.first_name,
+            'plan_name': service.plan.name,
+            'invoice_number': invoice.invoice_number,
+            'amount': invoice.amount,
+            'description': invoice.description,
+            'due_date': invoice.due_date.strftime('%Y-%m-%d'),
+            'year': timezone.now().year,
+        }
+
+        # Render HTML template
+        html_content = render_to_string('emails/service_renewal_reminder.html', context)
+        text_content = f"Hello {service.user.first_name}, Your {service.plan.name} service is due for renewal. Invoice: {invoice.invoice_number}, Amount: ${invoice.amount}, Due Date: {invoice.due_date.strftime('%Y-%m-%d')}. Please make payment to avoid service suspension."
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=to
         )
+        email.attach_alternative(html_content, "text/html")
+        email.send()
         
         return {'status': 'success'}
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
+
 
 @shared_task
 def suspend_service_task(service_id):
