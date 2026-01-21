@@ -55,7 +55,6 @@ def send_welcome_email(user_id):
     except Exception as e:
         return {'status': 'error', 'message': str(e)}  
 
-
 @shared_task
 # def create_vm_task(service_id):
 #     """
@@ -562,6 +561,36 @@ def suspend_service_task(service_id):
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
 
+# @shared_task
+# def send_suspension_email(service_id):
+#     """Send service suspension email"""
+#     try:
+#         service = Service.objects.get(id=service_id)
+        
+#         subject = f'Service Suspended - {service.plan.name}'
+#         message = f"""
+#         Hello {service.user.first_name},
+        
+#         Your {service.plan.name} service has been suspended due to non-payment.
+        
+#         Please make payment immediately to reactivate your service.
+        
+#         Best regards,
+#         Hosting Team
+#         """
+        
+#         send_mail(
+#             subject,
+#             message,
+#             settings.DEFAULT_FROM_EMAIL,
+#             [service.user.email],
+#             fail_silently=False,
+#         )
+        
+#         return {'status': 'success'}
+#     except Exception as e:
+#         return {'status': 'error', 'message': str(e)}
+
 @shared_task
 def send_suspension_email(service_id):
     """Send service suspension email"""
@@ -569,28 +598,30 @@ def send_suspension_email(service_id):
         service = Service.objects.get(id=service_id)
         
         subject = f'Service Suspended - {service.plan.name}'
-        message = f"""
-        Hello {service.user.first_name},
-        
-        Your {service.plan.name} service has been suspended due to non-payment.
-        
-        Please make payment immediately to reactivate your service.
-        
-        Best regards,
-        Hosting Team
-        """
-        
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [service.user.email],
-            fail_silently=False,
+        context = {
+            'name': service.user.first_name,
+            'plan_name': service.plan.name,
+            'status': service.status,
+            'amount': service.price,
+            'year': timezone.now().year,
+        }
+
+        # Render HTML template
+        html_content = render_to_string('emails/service_suspension.html', context)
+        text_content = f"Hello {service.user.first_name}, Your {service.plan.name} service has been suspended due to non-payment. Please make payment immediately to reactivate your service."
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[service.user.email]
         )
+        email.attach_alternative(html_content, "text/html")
+        email.send()
         
         return {'status': 'success'}
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
+
 
 @shared_task
 def reactivate_service_task(service_id):
