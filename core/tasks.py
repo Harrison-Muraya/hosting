@@ -299,54 +299,64 @@ def send_vm_deployment_failed_email(service_id, error_message):
         service = Service.objects.get(id=service_id)
         
         subject = '⚠️ Service Deployment Issue'
+        to = [service.user.email]
 
-        message = f"""
-Hello {service.user.first_name},
-
-We encountered an issue while deploying your {service.plan.name} service.
-
-Error Details:
-{error_message}
-
-Our technical team has been notified and is working to resolve this issue.
-We'll have your service up and running as soon as possible.
-
-Your payment has been processed successfully, and your service will be activated
-once the technical issue is resolved.
-
-If you have any questions, please don't hesitate to contact our support team.
-
-Best regards,
-The HostPro Team
-        """
-        
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [service.user.email],
-            fail_silently=False,
+        context ={
+            'name': service.user.first_name,
+            'plan_name': service.plan.name,
+            'status': service.status.upper(),
+            'error_message': error_message,
+            'year': timezone.now().year,
+        }
+        # Render HTML template
+        html_content = render_to_string('emails/vm_deployment_failed.html', context)
+        text_content = f"""Hello {service.user.first_name},
+                We encountered an issue while deploying your {service.plan.name} service.
+                Error Details:
+                {error_message}
+                Our technical team has been notified and is working to resolve this issue.
+                We'll have your service up and running as soon as possible.
+                Your payment has been processed successfully, and your service will be activated
+                once the technical issue is resolved.
+                If you have any questions, please don't hesitate to contact our support team.
+                Best regards,
+                The HostPro Team
+                 """
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=to
         )
-        
-        # Also notify admin
+        email.attach_alternative(html_content, "text/html")
+        email.send()
+
+        # email to admin
         if hasattr(settings, 'ADMIN_EMAIL'):
-            admin_message = f"""
-VM Deployment Failed:
-
-Service ID: {service_id}
-User: {service.user.username} ({service.user.email})
-Plan: {service.plan.name}
-Error: {error_message}
-
-Please investigate and resolve.
-            """
-            send_mail(
-                f'[URGENT] VM Deployment Failed - Service {service_id}',
-                admin_message,
-                settings.DEFAULT_FROM_EMAIL,
-                [settings.ADMIN_EMAIL],
-                fail_silently=True,
+            admin_context = {
+                'service_id': service_id,
+                'username': service.user.username,
+                'user_email': service.user.email,
+                'plan_name': service.plan.name,
+                'error_message': error_message,
+                'year': timezone.now().year,
+            }
+            admin_html_content = render_to_string('emails/admin_vm_deployment_failed.html', admin_context)
+            admin_text_content = f"""VM Deployment Failed:
+                Service ID: {service_id}
+                User: {service.user.username} ({service.user.email})
+                Plan: {service.plan.name}
+                Error: {error_message}
+                Please investigate and resolve.
+                 """
+            admin_email = EmailMultiAlternatives(
+                subject=f'[URGENT] VM Deployment Failed - Service {service_id}',
+                body=admin_text_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[settings.ADMIN_EMAIL]
             )
+            admin_email.attach_alternative(admin_html_content, "text/html")
+            admin_email.send()
         
         return {'status': 'success'}
     except Exception as e:
