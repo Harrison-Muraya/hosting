@@ -391,41 +391,6 @@ def check_service_renewals():
         # If past due date, suspend service
         if service.next_due_date < timezone.now():
             suspend_service_task.delay(service.id)
-
-@shared_task
-def send_renewal_reminder_email(service_id, invoice_id):
-    """Send renewal reminder email"""
-    try:
-        service = Service.objects.get(id=service_id)
-        invoice = Invoice.objects.get(id=invoice_id)
-        
-        subject = f'Service Renewal Due - {service.plan.name}'
-        message = f"""
-        Hello {service.user.first_name},
-        
-        Your {service.plan.name} service is due for renewal.
-        
-        Invoice: {invoice.invoice_number}
-        Amount: ${invoice.amount}
-        Due Date: {invoice.due_date.strftime('%Y-%m-%d')}
-        
-        Please make payment to avoid service suspension.
-        
-        Best regards,
-        Hosting Team
-        """
-        
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [service.user.email],
-            fail_silently=False,
-        )
-        
-        return {'status': 'success'}
-    except Exception as e:
-        return {'status': 'error', 'message': str(e)}
     
 # @shared_task
 # def send_service_credentials_email(service_id):
@@ -523,6 +488,7 @@ def send_service_credentials_email(service_id):
             'ram': service.plan.ram_mb,
             'disk': service.plan.disk_gb,
             'bandwidth': service.plan.bandwidth_gb,
+            'status': service.status.upper(),
             'billing_cycle': service.billing_cycle.title(),
             'amount': service.price,
             'next_due_date': service.next_due_date.strftime('%B %d, %Y'),
@@ -577,41 +543,6 @@ def check_service_renewals():
         if service.next_due_date < timezone.now():
             suspend_service_task.delay(service.id)
 
-# @shared_task
-# def send_renewal_reminder_email(service_id, invoice_id):
-#     """Send renewal reminder email"""
-#     try:
-#         service = Service.objects.get(id=service_id)
-#         invoice = Invoice.objects.get(id=invoice_id)
-        
-#         subject = f'Service Renewal Due - {service.plan.name}'
-#         message = f"""
-#         Hello {service.user.first_name},
-        
-#         Your {service.plan.name} service is due for renewal.
-        
-#         Invoice: {invoice.invoice_number}
-#         Amount: ${invoice.amount}
-#         Due Date: {invoice.due_date.strftime('%Y-%m-%d')}
-        
-#         Please make payment to avoid service suspension.
-        
-#         Best regards,
-#         Hosting Team
-#         """
-        
-#         send_mail(
-#             subject,
-#             message,
-#             settings.DEFAULT_FROM_EMAIL,
-#             [service.user.email],
-#             fail_silently=False,
-#         )
-        
-#         return {'status': 'success'}
-#     except Exception as e:
-#         return {'status': 'error', 'message': str(e)}
-
 # send renewal reminder email
 @shared_task
 def send_renewal_reminder_email(service_id, invoice_id):
@@ -629,7 +560,7 @@ def send_renewal_reminder_email(service_id, invoice_id):
             'invoice_number': invoice.invoice_number,
             'amount': invoice.amount,
             'description': invoice.description,
-            'due_date': invoice.due_date.strftime('%Y-%m-%d'),
+            'due_date': invoice.due_date.strftime('%B %d, %Y'),
             'year': timezone.now().year,
         }
 
