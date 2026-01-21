@@ -16,6 +16,7 @@ import logging
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
+# Welcome email task
 @shared_task
 def send_welcome_email(user_id):
     """Send welcome email to new user"""
@@ -23,53 +24,6 @@ def send_welcome_email(user_id):
         user = User.objects.get(id=user_id)
         
         subject = 'Welcome to HostPro!'
-        message = f"""
-        Hello {user.first_name}!
-        
-        Welcome to HostPro - Your Professional Hosting Solution!
-        
-        Thank you for registering with us. Your account has been successfully created.
-        
-        Account Details:
-        - Username: {user.username}
-        - Email: {user.email}
-        - Account Balance: ${user.balance}
-        
-        Getting Started:
-        1. Browse our hosting plans
-        2. Select a plan that suits your needs
-        3. Make payment via M-Pesa or PayPal
-        4. Your VM will be deployed automatically
-        
-        Need help? Contact our support team anytime.
-        
-        Best regards,
-        The HostPro Team
-        """
-        
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [user.email],
-            fail_silently=False,
-        )
-        
-        return {'status': 'success', 'message': f'Welcome email sent to {user.email}'}
-    except User.DoesNotExist:
-        return {'status': 'error', 'message': 'User not found'}
-    except Exception as e:
-        return {'status': 'error', 'message': str(e)}
-    
-
-@shared_task
-def send_welcome_email(user_id):
-    """Send welcome email to new user"""
-    try:
-        user = User.objects.get(id=user_id)
-        
-        subject = 'Welcome to HostPro!'
-
         from_email = settings.DEFAULT_FROM_EMAIL
         to_email = [user.email]
 
@@ -84,10 +38,11 @@ def send_welcome_email(user_id):
 
         # Render HTML template
         html_content = render_to_string('emails/welcome_email.html', context)
+        text_content = f"Welcome to HostPro, {user.first_name}! Your account has been created successfully."
         
         email = EmailMultiAlternatives(
             subject=subject,
-            body=html_content,
+            body=text_content,
             from_email=from_email,
             to=to_email
         )
@@ -190,7 +145,9 @@ def send_welcome_email(user_id):
 #         except:
 #             pass
 #         return {'status': 'error', 'message': str(e)}
-    
+
+# Updated create_vm_task with password generation before VM creation
+@shared_task 
 def create_vm_task(service_id):
     """
     Create VM for a service - REAL IMPLEMENTATION
@@ -274,6 +231,8 @@ def create_vm_task(service_id):
         except:
             pass
         return {'status': 'error', 'message': str(e)}
+
+# Send VM deployment failure email
 @shared_task
 def send_vm_deployment_failed_email(service_id, error_message):
     """Send email when VM deployment fails"""
@@ -334,6 +293,7 @@ Please investigate and resolve.
         logger.error(f"Failed to send deployment failure email: {str(e)}")
         return {'status': 'error', 'message': str(e)}
 
+# Check service renewals task
 @shared_task
 def check_service_renewals():
     """Check for services that need renewal"""
