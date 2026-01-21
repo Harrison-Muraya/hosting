@@ -561,36 +561,7 @@ def suspend_service_task(service_id):
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
 
-# @shared_task
-# def send_suspension_email(service_id):
-#     """Send service suspension email"""
-#     try:
-#         service = Service.objects.get(id=service_id)
-        
-#         subject = f'Service Suspended - {service.plan.name}'
-#         message = f"""
-#         Hello {service.user.first_name},
-        
-#         Your {service.plan.name} service has been suspended due to non-payment.
-        
-#         Please make payment immediately to reactivate your service.
-        
-#         Best regards,
-#         Hosting Team
-#         """
-        
-#         send_mail(
-#             subject,
-#             message,
-#             settings.DEFAULT_FROM_EMAIL,
-#             [service.user.email],
-#             fail_silently=False,
-#         )
-        
-#         return {'status': 'success'}
-#     except Exception as e:
-#         return {'status': 'error', 'message': str(e)}
-
+# suspension email task
 @shared_task
 def send_suspension_email(service_id):
     """Send service suspension email"""
@@ -621,7 +592,6 @@ def send_suspension_email(service_id):
         return {'status': 'success'}
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
-
 
 @shared_task
 def reactivate_service_task(service_id):
