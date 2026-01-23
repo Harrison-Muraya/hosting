@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 
+
 {% block title %}Home - Hosting Platform{% endblock %}
 
 {% block content %}
@@ -10,7 +11,14 @@
 
 <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
     {% for plan in plans %}
-    <div class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+            
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
+            data-plan-id="{{ plan.id }}"
+            data-monthly="{{ plan.price_monthly }}"
+            data-quarterly="{{ plan.price_quarterly|default:plan.price_monthly }}"
+            data-annually="{{ plan.price_annually|default:plan.price_monthly }}">
+
+
         <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6">
             <h3 class="text-2xl font-bold mb-2">{{ plan.name }}</h3>
             <p class="text-3xl font-bold">${{ plan.price_monthly }}<span class="text-sm font-normal">/month</span></p>
@@ -34,9 +42,14 @@
                     <span>{{ plan.bandwidth_gb }}GB Bandwidth</span>
                 </li>
             </ul>
-            <a href="/api/services/create/?plan={{ plan.id }}" class="block w-full bg-blue-500 text-white text-center py-3 rounded-lg hover:bg-blue-600 transition-colors">
+            <button onclick="orderPlan({{ plan.id }}, '{{ plan.name }}')" class="block w-full bg-blue-500 text-white text-center py-3 rounded-lg hover:bg-blue-600 transition-colors">
                 Order Now
-            </a>
+            </button>
+
+            <!-- <a href="/api/services/create/?plan={{ plan.id }}" class="block w-full bg-blue-500 text-white text-center py-3 rounded-lg hover:bg-blue-600 transition-colors">
+                Order Now
+            </a> -->
+            
         </div>
     </div>
     {% endfor %}
@@ -67,4 +80,135 @@
         </div>
     </div>
 </div>
+<!-- Order Modal -->
+ {% include 'modals/orderModal.html' %}
+
+ <script>
+
+let currentBillingCycle = 'monthly';
+let selectedPlan = null;
+
+function changeBillingCycle(cycle) {
+    currentBillingCycle = cycle;
+    
+    // Update button styles
+    document.querySelectorAll('.billing-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(cycle + 'Btn').classList.add('active');
+    
+    // Update all plan prices
+    document.querySelectorAll('.plan-card').forEach(card => {
+        const priceEl = card.querySelector('.plan-price');
+        const price = card.dataset[cycle];
+        priceEl.textContent = price;
+    });
+}
+
+function orderPlan(planId, planName) {
+    {% if not user.is_authenticated %}
+        window.location.href = '/auth/login/?next=/plans/';
+        return;
+    {% endif %}
+    
+    selectedPlan = planId;
+    const card = document.querySelector(`[data-plan-id="${planId}"]`);
+    
+    document.getElementById('orderPlanId').value = planId;
+    document.getElementById('modalPlanName').textContent = planName;
+    document.getElementById('summaryPlanName').textContent = planName;
+    
+    // Set prices in modal
+    document.getElementById('monthlyPrice').textContent = '$' + card.dataset.monthly;
+    document.getElementById('quarterlyPrice').textContent = '$' + card.dataset.quarterly;
+    document.getElementById('annuallyPrice').textContent = '$' + card.dataset.annually;
+    document.getElementById('summaryTotal').textContent = '$' + card.dataset.monthly;
+    
+    document.getElementById('orderModal').classList.remove('hidden');
+}
+
+function closeOrderModal() {
+    document.getElementById('orderModal').classList.add('hidden');
+}
+
+// Update summary when billing cycle changes
+document.addEventListener('DOMContentLoaded', function() {
+    const billingInputs = document.querySelectorAll('input[name="billing_cycle"]');
+    billingInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            const cycle = this.value;
+            document.getElementById('summaryBillingCycle').textContent = 
+                cycle.charAt(0).toUpperCase() + cycle.slice(1);
+            
+            const card = document.querySelector(`[data-plan-id="${selectedPlan}"]`);
+            if (card) {
+                const price = card.dataset[cycle];
+                document.getElementById('summaryTotal').textContent = '$' + price;
+            }
+        });
+    });
+});
+
+// Handle form submission
+document.getElementById('orderForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const errorDiv = document.getElementById('orderError');
+    const submitBtn = document.getElementById('orderSubmitBtn');
+    
+    errorDiv.classList.add('hidden');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
+    
+    const formData = {
+        plan_id: document.getElementById('orderPlanId').value,
+        billing_cycle: document.querySelector('input[name="billing_cycle"]:checked').value,
+        domain: document.getElementById('domain').value
+    };
+    
+    try {
+        const response = await fetch('/api/services/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            // Success - redirect to payment page
+            window.location.href = `/dashboard/invoices/?new_invoice=${data.invoice.id}`;
+        } else {
+            errorDiv.textContent = data.error || 'Failed to create service. Please try again.';
+            errorDiv.classList.remove('hidden');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-credit-card mr-2"></i> Proceed to Payment';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        errorDiv.textContent = 'An error occurred. Please try again.';
+        errorDiv.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-credit-card mr-2"></i> Proceed to Payment';
+    }
+});
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+
 {% endblock %}
