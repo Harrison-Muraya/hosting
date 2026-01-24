@@ -4,6 +4,10 @@ __pycache__/
 *$py.class
 *.so
 .Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 .env
 env/
 venv/
