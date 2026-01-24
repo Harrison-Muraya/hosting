@@ -55,7 +55,7 @@ def send_welcome_email(user_id):
     except Exception as e:
         return {'status': 'error', 'message': str(e)}  
 
-@shared_task
+# @shared_task
 # def create_vm_task(service_id):
 #     """
 #     Create VM for a service - REAL IMPLEMENTATION
@@ -364,34 +364,6 @@ def send_vm_deployment_failed_email(service_id, error_message):
         return {'status': 'error', 'message': str(e)}
 
 
-# Check service renewals task
-@shared_task
-def check_service_renewals():
-    """Check for services that need renewal"""
-    tomorrow = timezone.now() + timedelta(days=1)
-    services = Service.objects.filter(
-        status='active',
-        next_due_date__lte=tomorrow
-    )
-    
-    for service in services:
-        # Create invoice
-        invoice = Invoice.objects.create(
-            user=service.user,
-            service=service,
-            invoice_number=f'INV-{uuid.uuid4().hex[:8].upper()}',
-            amount=service.price,
-            due_date=service.next_due_date,
-            description=f'Renewal for {service.plan.name}'
-        )
-        
-        # Send reminder email
-        send_renewal_reminder_email.delay(service.id, invoice.id)
-        
-        # If past due date, suspend service
-        if service.next_due_date < timezone.now():
-            suspend_service_task.delay(service.id)
-    
 # @shared_task
 # def send_service_credentials_email(service_id):
 #     """Send service credentials to user"""
@@ -515,7 +487,7 @@ def send_service_credentials_email(service_id):
         logger.error(f"Failed to send credentials email for service {service_id}: {str(e)}")
         return {'status': 'error', 'message': str(e)}
 
-
+# Check service renewals task
 @shared_task
 def check_service_renewals():
     """Check for services that need renewal"""
