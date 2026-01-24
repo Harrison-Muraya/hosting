@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ plan_name }}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #1f2937;
+            padding: 20px;
+            margin: 0;
+        }
+        .template-selector {
+            max-width: 800px;
+            margin: 0 auto 30px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .template-selector h2 {
+            margin: 0 0 20px 0;
+            color: #1f2937;
+            font-size: 24px;
+        }
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .template-btn {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        .template-btn:hover {
+            transform: translateY(-2px);
+        }
+        .template-btn.active {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        .email-preview {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #f5f5f5;
+            padding: 40px 20px;
+            border-radius: 12px;
+        }
+        /* .template-content {
+            display: none;
+        }
+        .template-content.active {
+            display: block;
+        } */
+    </style>
+</head>
+<body>
+    <!-- WELCOME EMAIL -->
+    <div id="welcome" class="template-content active">
+        <table role="presentation" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <tr>
+                <td style="background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%); padding: 40px 40px 30px 40px; border-radius: 12px 12px 0 0;">
+                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">HostPro</h1>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 40px;">
+                    <h2 style="margin: 0 0 24px 0; color: #1f2937; font-size: 24px; font-weight: 600;">Hello {{ name }}! 👋</h2>
+                    <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                        Welcome to <strong style="color: #4F46E5;">HostPro</strong> - Your Professional Hosting Solution!
+                    </p>
+                    <p style="margin: 0 0 30px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                        Thank you for registering with us. Your account has been successfully created and you're ready to get started!
+                    </p>
+                    
+                    <table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%; background-color: #f9fafb; border-radius: 8px; border-left: 4px solid #4F46E5; margin-bottom: 30px;">
+                        <tr>
+                            <td style="padding: 24px;">
+                                <h3 style="margin: 0 0 16px 0; color: #1f2937; font-size: 16px; font-weight: 600;">📋 Account Details</h3>
+                                <table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%;">
+                                    <tr>
+                                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Username:</td>
+                                        <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600; text-align: right;">{{ username }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Email:</td>
+                                        <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600; text-align: right;">{{ email }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Account Balance:</td>
+                                        <td style="padding: 8px 0; color: #10b981; font-size: 14px; font-weight: 700; text-align: right;">${{ balance }}</td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                    
+                    <h3 style="margin: 0 0 16px 0; color: #1f2937; font-size: 18px; font-weight: 600;">🚀 Getting Started</h3>
+                    <table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 30px;">
+                        <tr>
+                            <td style="padding: 12px 0;">
+                                <table role="presentation" cellpadding="0" cellspacing="0">
+                                    <tr>
+                                        <td style="width: 32px; vertical-align: top;">
+                                            <div style="width: 24px; height: 24px; background-color: #4F46E5; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; font-weight: 600;">1</div>
+                                        </td>
+                                        <td style="padding-left: 12px; color: #4b5563; font-size: 15px; line-height: 1.6;">Browse our hosting plans</td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 0;">
+                                <table role="presentation" cellpadding="0" cellspacing="0">
+                                    <tr>
+                                        <td style="width: 32px; vertical-align: top;">
+                                            <div style="width: 24px; height: 24px; background-color: #4F46E5; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; font-weight: 600;">2</div>
+                                        </td>
+                                        <td style="padding-left: 12px; color: #4b5563; font-size: 15px; line-height: 1.6;">Select a plan that suits your needs</td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 0;">
+                                <table role="presentation" cellpadding="0" cellspacing="0">
+                                    <tr>
+                                        <td style="width: 32px; vertical-align: top;">
+                                            <div style="width: 24px; height: 24px; background-color: #4F46E5; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; font-weight: 600;">3</div>
+                                        </td>
+                                        <td style="padding-left: 12px; color: #4b5563; font-size: 15px; line-height: 1.6;">Make payment via M-Pesa or PayPal</td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 0;">
+                                <table role="presentation" cellpadding="0" cellspacing="0">
+                                    <tr>
+                                        <td style="width: 32px; vertical-align: top;">
+                                            <div style="width: 24px; height: 24px; background-color: #4F46E5; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; font-weight: 600;">4</div>
+                                        </td>
+                                        <td style="padding-left: 12px; color: #4b5563; font-size: 15px; line-height: 1.6;">Your VM will be deployed automatically</td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                    
+                    <table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 30px;">
+                        <tr>
+                            <td style="text-align: center;">
+                                <a href="#" style="display: inline-block; background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.3);">View Dashboard</a>
+                            </td>
+                        </tr>
+                    </table>
+                    
+                    <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 16px; margin-bottom: 30px;">
+                        <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                            <strong style="color: #78350f;">💬 Need help?</strong><br>
+                            Contact our support team anytime at support@hostpro.com
+                        </p>
+                    </div>
+                    
+                    <p style="margin: 0; color: #4b5563; font-size: 15px; line-height: 1.6;">
+                        Best regards,<br>
+                        <strong style="color: #1f2937;">The HostPro Team</strong>
+                    </p>
+                </td>
+            </tr>
+            <tr>
+                <td style="background-color: #f9fafb; padding: 30px 40px; border-radius: 0 0 12px 12px; border-top: 1px solid #e5e7eb;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%;">
+                        <tr>
+                            <td style="text-align: center;">
+                                <p style="margin: 0 0 12px 0; color: #6b7280; font-size: 13px;">HostPro - Your Professional Hosting Solution</p>
+                                <p style="margin: 0 0 12px 0; color: #9ca3af; font-size: 12px;">Nairobi, Kenya | support@hostpro.com</p>
+                                <p style="margin: 0; color: #9ca3af; font-size: 11px;">© {{ year }} HostPro. All rights reserved.</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>

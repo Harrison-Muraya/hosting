@@ -47,6 +47,15 @@ class Plan(models.Model):
     is_active = models.BooleanField(default=True)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def ram_display(self):
+        """Display RAM in GB or MB"""
+        if self.ram_mb >= 1024:
+            gb = self.ram_mb / 1024
+            # Remove .0 if it's a whole number
+            return f"{gb:.0f} GB" if gb == int(gb) else f"{gb:.1f} GB"
+        return f"{self.ram_mb} MB"
     
     class Meta:
         db_table = 'plans'

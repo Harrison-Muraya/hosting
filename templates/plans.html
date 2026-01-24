@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 
+
 {% block title %}Hosting Plans - HostPro{% endblock %}
 
 {% block content %}
@@ -62,7 +63,7 @@
                     </li>
                     <li class="flex items-start">
                         <i class="fas fa-memory text-blue-500 mr-3 mt-1"></i>
-                        <span><strong>{{ plan.ram_mb|filesizeformat }}</strong> RAM</span>
+                        <span><strong>{{ plan.ram_display }}</strong> RAM</span>
                     </li>
                     <li class="flex items-start">
                         <i class="fas fa-hdd text-blue-500 mr-3 mt-1"></i>
@@ -194,116 +195,7 @@
 </div>
 
 <!-- Order Modal -->
-<div id="orderModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-screen overflow-y-auto">
-        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-2xl">
-            <div class="flex justify-between items-center">
-                <h3 class="text-2xl font-bold">
-                    <i class="fas fa-shopping-cart mr-2"></i> Order <span id="modalPlanName"></span>
-                </h3>
-                <button onclick="closeOrderModal()" class="text-white hover:text-gray-200">
-                    <i class="fas fa-times text-2xl"></i>
-                </button>
-            </div>
-        </div>
-
-        <div class="p-8">
-            <!-- Login Required Message (if not authenticated) -->
-            {% if not user.is_authenticated %}
-            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                <p class="text-yellow-800 flex items-center">
-                    <i class="fas fa-exclamation-triangle mr-2"></i>
-                    You need to <a href="/auth/login/" class="font-bold underline">login</a> or 
-                    <a href="/auth/register/" class="font-bold underline">register</a> to order a plan.
-                </p>
-            </div>
-            {% else %}
-            
-            <form id="orderForm">
-                {% csrf_token %}
-                <input type="hidden" id="orderPlanId" name="plan_id">
-
-                <!-- Billing Cycle Selection -->
-                <div class="mb-6">
-                    <label class="block text-sm font-bold text-gray-700 mb-3">Select Billing Cycle</label>
-                    <div class="grid grid-cols-3 gap-4">
-                        <label class="relative">
-                            <input type="radio" name="billing_cycle" value="monthly" checked class="peer sr-only">
-                            <div class="border-2 border-gray-300 rounded-lg p-4 cursor-pointer peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
-                                <p class="font-bold text-center">Monthly</p>
-                                <p class="text-2xl font-bold text-center text-blue-600" id="monthlyPrice">$0</p>
-                                <p class="text-sm text-center text-gray-500">/month</p>
-                            </div>
-                        </label>
-                        <label class="relative">
-                            <input type="radio" name="billing_cycle" value="quarterly" class="peer sr-only">
-                            <div class="border-2 border-gray-300 rounded-lg p-4 cursor-pointer peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
-                                <p class="font-bold text-center">Quarterly</p>
-                                <p class="text-2xl font-bold text-center text-blue-600" id="quarterlyPrice">$0</p>
-                                <p class="text-sm text-center text-gray-500">/3 months</p>
-                                <span class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded">Save 10%</span>
-                            </div>
-                        </label>
-                        <label class="relative">
-                            <input type="radio" name="billing_cycle" value="annually" class="peer sr-only">
-                            <div class="border-2 border-gray-300 rounded-lg p-4 cursor-pointer peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
-                                <p class="font-bold text-center">Annually</p>
-                                <p class="text-2xl font-bold text-center text-blue-600" id="annuallyPrice">$0</p>
-                                <p class="text-sm text-center text-gray-500">/year</p>
-                                <span class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded">Save 20%</span>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Optional: Domain Name -->
-                <div class="mb-6">
-                    <label for="domain" class="block text-sm font-bold text-gray-700 mb-2">
-                        Domain Name (Optional)
-                    </label>
-                    <input type="text" id="domain" name="domain"
-                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                           placeholder="example.com">
-                    <p class="text-sm text-gray-500 mt-1">You can add or change this later</p>
-                </div>
-
-                <!-- Order Summary -->
-                <div class="bg-gray-50 rounded-lg p-6 mb-6">
-                    <h4 class="font-bold text-lg mb-4">Order Summary</h4>
-                    <div class="space-y-2">
-                        <div class="flex justify-between">
-                            <span>Plan:</span>
-                            <span class="font-bold" id="summaryPlanName">-</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span>Billing Cycle:</span>
-                            <span class="font-bold" id="summaryBillingCycle">Monthly</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span>Current Balance:</span>
-                            <span class="font-bold text-green-600">${{ user.balance }}</span>
-                        </div>
-                        <hr class="my-2">
-                        <div class="flex justify-between text-lg">
-                            <span class="font-bold">Total:</span>
-                            <span class="font-bold text-blue-600 text-2xl" id="summaryTotal">$0</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Error Message -->
-                <div id="orderError" class="hidden mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"></div>
-
-                <!-- Submit Button -->
-                <button type="submit" id="orderSubmitBtn"
-                        class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-lg font-bold text-lg hover:from-blue-700 hover:to-indigo-700 transition-all transform hover:scale-105 shadow-lg">
-                    <i class="fas fa-credit-card mr-2"></i> Proceed to Payment
-                </button>
-            </form>
-            {% endif %}
-        </div>
-    </div>
-</div>
+ {% include 'modals/orderModal.html' %}
 
 <style>
     .billing-btn {
@@ -315,7 +207,9 @@
     }
 </style>
 
+
 <script>
+
 let currentBillingCycle = 'monthly';
 let selectedPlan = null;
 
@@ -441,4 +335,5 @@ function getCookie(name) {
     return cookieValue;
 }
 </script>
+
 {% endblock %}

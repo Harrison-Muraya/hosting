@@ -147,99 +147,156 @@ class ProxmoxManager:
             logger.error(f"Failed to get disk size: {str(e)}")
             return 0
         
+    def wait_for_task(self, upid, timeout=300):
+        """
+        Wait for a Proxmox task to complete
+        """
+        logger.info(f"Waiting for task {upid} to complete...")
+        start_time = time.time()
+        
+        while (time.time() - start_time) < timeout:
+            try:
+                status = self.proxmox.nodes(self.node).tasks(upid).status.get()
+                task_status = status.get('status')
+                
+                if task_status == 'stopped':
+                    exitstatus = status.get('exitstatus')
+                    if exitstatus == 'OK':
+                        logger.info(f"Task {upid} completed successfully")
+                        return True
+                    else:
+                        logger.error(f"Task {upid} failed: {exitstatus}")
+                        return False
+            except Exception as e:
+                logger.debug(f"Error checking task status: {str(e)}")
+            
+            time.sleep(2)
+        
+        logger.warning(f"Task {upid} timed out after {timeout} seconds")
+        return False
 
-    def create_vm_from_template(self, vmid, name, cores, memory, disk, template_id=None):
+    def wait_for_lock_release(self, vmid, timeout=60):
+        """
+        Wait for VM lock to be released
+        """
+        logger.info(f"Waiting for VM {vmid} lock to be released...")
+        start_time = time.time()
+        
+        while (time.time() - start_time) < timeout:
+            try:
+                config = self.proxmox.nodes(self.node).qemu(vmid).config.get()
+                # If we can read config without error and there's no lock, we're good
+                if 'lock' not in config:
+                    logger.info(f"VM {vmid} lock released")
+                    return True
+            except Exception as e:
+                logger.debug(f"Waiting for lock release: {str(e)}")
+            
+            time.sleep(2)
+        
+        logger.warning(f"VM {vmid} lock not released after {timeout} seconds")
+        return False
+
+    def create_vm_from_template(self, vmid, name, cores, memory, disk, template_id=None, password=None):
         """
         Create VM by cloning a template
+        This is faster than creating from scratch
         """
         if not self.proxmox:
-            return {'status': 'error', 'message': 'Proxmox not configured'}
+            return {
+                'status': 'error',
+                'message': 'Proxmox not configured'
+            }
         
         try:
+            # If template_id provided, clone it
             if template_id:
                 logger.info(f"Cloning template {template_id} to VM {vmid}")
                 
-                # Clone the template
+                # Clone the template - this returns a task ID (UPID)
                 clone_response = self.proxmox.nodes(self.node).qemu(template_id).clone.post(
                     newid=vmid,
                     name=name,
-                    full=1
+                    full=1  # Full clone
                 )
                 
+                # Extract UPID from response
                 upid = clone_response
                 logger.info(f"Clone task started: {upid}")
                 
-                # Wait for clone to complete
+                # Wait for clone task to complete
                 if not self.wait_for_task(upid, timeout=300):
-                    return {'status': 'error', 'message': 'Clone operation failed'}
+                    return {
+                        'status': 'error',
+                        'message': 'Clone operation timed out or failed'
+                    }
                 
-                # Wait for lock release
+                # Wait for lock to be released
                 if not self.wait_for_lock_release(vmid, timeout=60):
-                    logger.warning(f"VM {vmid} lock timeout, waiting additional time...")
-                    time.sleep(10)
+                    logger.warning(f"VM {vmid} lock still present, attempting to continue...")
                 
-                # Check current disk size
-                current_disk_size = self.get_vm_disk_size(vmid)
-                logger.info(f"Template disk size: {current_disk_size}GB, Requested: {disk}GB")
+                # Additional wait to ensure everything is settled
+                time.sleep(5)
                 
-                # Only resize if requested size is LARGER than current
-                if disk > current_disk_size:
-                    logger.info(f"Resizing disk from {current_disk_size}GB to {disk}GB")
-                    try:
-                        # Calculate the increase amount
-                        increase = disk - current_disk_size
-                        resize_response = self.proxmox.nodes(self.node).qemu(vmid).resize.put(
-                            disk='scsi0',
-                            size=f'+{increase}G'  # Use +XG to increase by X gigabytes
-                        )
-                        
-                        if isinstance(resize_response, str) and resize_response.startswith('UPID:'):
-                            self.wait_for_task(resize_response, timeout=120)
-                        
-                        time.sleep(5)
-                    except Exception as e:
-                        logger.error(f"Disk resize failed: {str(e)}")
-                        # Continue anyway, disk size from template might be sufficient
-                else:
-                    logger.info(f"Disk size {current_disk_size}GB from template is sufficient (requested {disk}GB)")
+                # Resize disk if needed
+                logger.info(f"Resizing disk to {disk}GB")
+                try:
+                    resize_response = self.proxmox.nodes(self.node).qemu(vmid).resize.put(
+                        disk='scsi0',
+                        size=f'{disk}G'
+                    )
+                    # Wait for resize to complete
+                    if isinstance(resize_response, str) and resize_response.startswith('UPID:'):
+                        self.wait_for_task(resize_response, timeout=120)
+                    time.sleep(3)
+                except Exception as e:
+                    logger.warning(f"Disk resize may have failed: {str(e)}")
                 
-                # Wait for lock release before config update
+                # Wait for lock again before config update
                 self.wait_for_lock_release(vmid, timeout=60)
-                time.sleep(3)
                 
                 # Update CPU and memory
                 logger.info(f"Updating CPU ({cores} cores) and memory ({memory}MB)")
                 try:
-                    self.proxmox.nodes(self.node).qemu(vmid).config.put(
-                        cores=cores,
-                        memory=memory
-                    )
+                    config_updates = {
+                        'cores': cores,
+                        'memory': memory
+                    }
+                    
+                    # Add cloud-init configuration if password provided
+                    if password:
+                        logger.info(f"Configuring cloud-init with new password")
+                        # Set cloud-init user and password
+                        config_updates['ciuser'] = 'root'
+                        config_updates['cipassword'] = password
+                        # Enable DHCP for networking
+                        config_updates['ipconfig0'] = 'ip=dhcp'
+                    
+                    self.proxmox.nodes(self.node).qemu(vmid).config.put(**config_updates)
                     time.sleep(3)
                 except Exception as e:
-                    logger.error(f"Config update failed: {str(e)}")
-                    # Continue anyway
+                    logger.warning(f"Config update may have failed: {str(e)}")
+                
             else:
+                # Create new VM from scratch
+                logger.info(f"Creating new VM {vmid} from scratch")
                 return self.create_vm_from_scratch(vmid, name, cores, memory, disk)
             
-            # Final wait before starting
+            # Wait for lock release before starting
             self.wait_for_lock_release(vmid, timeout=60)
-            time.sleep(5)
             
             # Start the VM
             logger.info(f"Starting VM {vmid}")
-            try:
-                start_response = self.proxmox.nodes(self.node).qemu(vmid).status.start.post()
-                
-                if isinstance(start_response, str) and start_response.startswith('UPID:'):
-                    self.wait_for_task(start_response, timeout=120)
-                
-                time.sleep(10)
-            except Exception as e:
-                logger.error(f"Failed to start VM: {str(e)}")
-                return {'status': 'error', 'message': f'VM created but failed to start: {str(e)}'}
+            start_response = self.proxmox.nodes(self.node).qemu(vmid).status.start.post()
+            
+            # Wait for start task if UPID returned
+            if isinstance(start_response, str) and start_response.startswith('UPID:'):
+                self.wait_for_task(start_response, timeout=120)
+            
+            time.sleep(5)
             
             # Wait for IP address
-            ip_address = self.wait_for_ip(vmid, timeout=180)
+            ip_address = self.wait_for_ip(vmid, timeout=120)
             
             return {
                 'status': 'success',
@@ -252,17 +309,19 @@ class ProxmoxManager:
         except Exception as e:
             logger.error(f"Failed to create VM from template: {str(e)}")
             
-            # Cleanup on failure
+            # Try to clean up if VM was partially created
             try:
-                logger.info(f"Attempting cleanup of VM {vmid}")
-                time.sleep(5)
+                logger.info(f"Attempting to clean up VM {vmid}")
                 self.delete_vm(vmid)
             except:
-                logger.warning(f"Cleanup of VM {vmid} failed")
+                pass
             
-            return {'status': 'error', 'message': str(e)}
+            return {
+                'status': 'error',
+                'message': str(e)
+            }
 
-
+   
     def create_vm_from_scratch(self, vmid, name, cores, memory, disk):
         """
         Create VM from scratch with Ubuntu Cloud Image
@@ -324,7 +383,23 @@ class ProxmoxManager:
                 'vmid': vmid
             }
     # main method to create VM
-    def create_vm(self, vmid, name, cores, memory, disk, template_id=None):
+    # def create_vm(self, vmid, name, cores, memory, disk, template_id=None):
+    #     """
+    #     Main method to create VM
+    #     Tries template first, falls back to scratch
+    #     """
+    #     logger.info(f"Creating VM: {name} (VMID: {vmid})")
+    #     logger.info(f"Resources: {cores} cores, {memory}MB RAM, {disk}GB disk")
+        
+    #     # Try template first if available
+    #     if template_id:
+    #         result = self.create_vm_from_template(vmid, name, cores, memory, disk, template_id)
+    #     else:
+    #         result = self.create_vm_from_scratch(vmid, name, cores, memory, disk)
+        
+    #     return result
+
+    def create_vm(self, vmid, name, cores, memory, disk, template_id=None, password=None):
         """
         Main method to create VM
         Tries template first, falls back to scratch
@@ -334,7 +409,7 @@ class ProxmoxManager:
         
         # Try template first if available
         if template_id:
-            result = self.create_vm_from_template(vmid, name, cores, memory, disk, template_id)
+            result = self.create_vm_from_template(vmid, name, cores, memory, disk, template_id, password)
         else:
             result = self.create_vm_from_scratch(vmid, name, cores, memory, disk)
         

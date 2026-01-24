@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
+.env
 env/
 venv/
 ENV/
@@ -23,9 +24,9 @@ wheels/
 .installed.cfg
 *.egg
 .env
-# .venv
-# db.sqlite3
-# db.sqlite3-journal
+.venv
+db.sqlite3
+db.sqlite3-journal
 /static/
 /staticfiles/
 /media/

@@ -1,5 +1,6 @@
 from celery import shared_task
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMultiAlternatives
+from django.template.loader import render_to_string
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
@@ -10,9 +11,12 @@ from payments.models import Invoice, Transaction
 import uuid
 import logging
 
+
+
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
+# Welcome email task
 @shared_task
 def send_welcome_email(user_id):
     """Send welcome email to new user"""
@@ -20,46 +24,129 @@ def send_welcome_email(user_id):
         user = User.objects.get(id=user_id)
         
         subject = 'Welcome to HostPro!'
-        message = f"""
-        Hello {user.first_name}!
+        from_email = settings.DEFAULT_FROM_EMAIL
+        to_email = [user.email]
+
+        # context for email template
+        context = {
+            'name': user.first_name,
+            'email': user.email,
+            'username': user.username,
+            'year': timezone.now().year,
+            'balance': user.balance,
+        }
+
+        # Render HTML template
+        html_content = render_to_string('emails/welcome_email.html', context)
+        text_content = f"Welcome to HostPro, {user.first_name}! Your account has been created successfully."
         
-        Welcome to HostPro - Your Professional Hosting Solution!
-        
-        Thank you for registering with us. Your account has been successfully created.
-        
-        Account Details:
-        - Username: {user.username}
-        - Email: {user.email}
-        - Account Balance: ${user.balance}
-        
-        Getting Started:
-        1. Browse our hosting plans
-        2. Select a plan that suits your needs
-        3. Make payment via M-Pesa or PayPal
-        4. Your VM will be deployed automatically
-        
-        Need help? Contact our support team anytime.
-        
-        Best regards,
-        The HostPro Team
-        """
-        
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [user.email],
-            fail_silently=False,
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=from_email,
+            to=to_email
         )
+        email.attach_alternative(html_content, "text/html")
+        email.send()
         
         return {'status': 'success', 'message': f'Welcome email sent to {user.email}'}
     except User.DoesNotExist:
         return {'status': 'error', 'message': 'User not found'}
     except Exception as e:
-        return {'status': 'error', 'message': str(e)}
-    
+        return {'status': 'error', 'message': str(e)}  
 
 @shared_task
+# def create_vm_task(service_id):
+#     """
+#     Create VM for a service - REAL IMPLEMENTATION
+#     """
+#     logger.info(f"Starting VM creation for service {service_id}")
+    
+#     try:
+#         service = Service.objects.get(id=service_id)
+#         proxmox = ProxmoxManager()
+        
+#         # Test Proxmox connection first
+#         connection_test = proxmox.test_connection()
+#         if connection_test['status'] != 'success':
+#             logger.error(f"Proxmox connection failed: {connection_test['message']}")
+#             service.status = 'suspended'
+#             service.save()
+#             send_vm_deployment_failed_email.delay(service_id, connection_test['message'])
+#             return {
+#                 'status': 'error',
+#                 'message': 'Proxmox connection failed'
+#             }
+        
+#         # Get next VM ID
+#         vmid = proxmox.get_next_vmid()
+#         vm_name = f"vps-{service.user.username}-{vmid}"
+        
+#         logger.info(f"Creating VM {vmid} for service {service_id}")
+#         logger.info(f"Specs: {service.plan.cpu_cores} cores, {service.plan.ram_mb}MB RAM, {service.plan.disk_gb}GB disk")
+        
+#         # Create the VM
+#         template_id = getattr(settings, 'PROXMOX_TEMPLATE_ID', None)
+#         result = proxmox.create_vm(
+#             vmid=vmid,
+#             name=vm_name,
+#             cores=service.plan.cpu_cores,
+#             memory=service.plan.ram_mb,
+#             disk=service.plan.disk_gb,
+#             template_id=template_id
+#         )
+        
+#         if result['status'] == 'success':
+#             # Generate credentials
+#             password = proxmox.generate_password()
+            
+#             # Update service
+#             service.vm_id = vmid
+#             service.ip_address = result.get('ip_address')
+#             service.username = 'root'
+#             service.password = password
+#             service.status = 'active'
+#             service.activated_at = timezone.now()
+#             service.save()
+            
+#             logger.info(f"VM {vmid} created successfully for service {service_id}")
+#             logger.info(f"IP Address: {service.ip_address}")
+            
+#             # Send email with credentials
+#             send_service_credentials_email.delay(service_id)
+            
+#             return {
+#                 'status': 'success',
+#                 'vmid': vmid,
+#                 'ip_address': service.ip_address,
+#                 'message': 'VM created successfully'
+#             }
+#         else:
+#             logger.error(f"VM creation failed for service {service_id}: {result['message']}")
+#             service.status = 'suspended'
+#             service.save()
+            
+#             # Send failure email
+#             send_vm_deployment_failed_email.delay(service_id, result['message'])
+            
+#             return result
+            
+#     except Service.DoesNotExist:
+#         logger.error(f"Service {service_id} not found")
+#         return {'status': 'error', 'message': 'Service not found'}
+#     except Exception as e:
+#         logger.error(f"Exception during VM creation for service {service_id}: {str(e)}")
+#         try:
+#             service = Service.objects.get(id=service_id)
+#             service.status = 'suspended'
+#             service.save()
+#             send_vm_deployment_failed_email.delay(service_id, str(e))
+#         except:
+#             pass
+#         return {'status': 'error', 'message': str(e)}
+
+# Updated create_vm_task with password generation before VM creation
+@shared_task 
 def create_vm_task(service_id):
     """
     Create VM for a service - REAL IMPLEMENTATION
@@ -70,26 +157,26 @@ def create_vm_task(service_id):
         service = Service.objects.get(id=service_id)
         proxmox = ProxmoxManager()
         
-        # Test Proxmox connection first
+        # Test connection
         connection_test = proxmox.test_connection()
         if connection_test['status'] != 'success':
             logger.error(f"Proxmox connection failed: {connection_test['message']}")
             service.status = 'suspended'
             service.save()
             send_vm_deployment_failed_email.delay(service_id, connection_test['message'])
-            return {
-                'status': 'error',
-                'message': 'Proxmox connection failed'
-            }
+            return {'status': 'error', 'message': 'Proxmox connection failed'}
         
         # Get next VM ID
         vmid = proxmox.get_next_vmid()
         vm_name = f"vps-{service.user.username}-{vmid}"
         
+        # Generate password BEFORE creating VM
+        password = proxmox.generate_password()
+        
         logger.info(f"Creating VM {vmid} for service {service_id}")
         logger.info(f"Specs: {service.plan.cpu_cores} cores, {service.plan.ram_mb}MB RAM, {service.plan.disk_gb}GB disk")
         
-        # Create the VM
+        # Create the VM with password
         template_id = getattr(settings, 'PROXMOX_TEMPLATE_ID', None)
         result = proxmox.create_vm(
             vmid=vmid,
@@ -97,18 +184,16 @@ def create_vm_task(service_id):
             cores=service.plan.cpu_cores,
             memory=service.plan.ram_mb,
             disk=service.plan.disk_gb,
-            template_id=template_id
+            template_id=template_id,
+            password=password  # Pass the password here
         )
         
         if result['status'] == 'success':
-            # Generate credentials
-            password = proxmox.generate_password()
-            
-            # Update service
+            # Update service with credentials
             service.vm_id = vmid
             service.ip_address = result.get('ip_address')
             service.username = 'root'
-            service.password = password
+            service.password = password  # Save the generated password
             service.status = 'active'
             service.activated_at = timezone.now()
             service.save()
@@ -129,10 +214,7 @@ def create_vm_task(service_id):
             logger.error(f"VM creation failed for service {service_id}: {result['message']}")
             service.status = 'suspended'
             service.save()
-            
-            # Send failure email
             send_vm_deployment_failed_email.delay(service_id, result['message'])
-            
             return result
             
     except Service.DoesNotExist:
@@ -148,7 +230,68 @@ def create_vm_task(service_id):
         except:
             pass
         return {'status': 'error', 'message': str(e)}
-    
+
+# Send VM deployment failure email
+# @shared_task
+# def send_vm_deployment_failed_email(service_id, error_message):
+#     """Send email when VM deployment fails"""
+#     try:
+#         service = Service.objects.get(id=service_id)
+        
+#         subject = '⚠️ Service Deployment Issue'
+#         message = f"""
+# Hello {service.user.first_name},
+
+# We encountered an issue while deploying your {service.plan.name} service.
+
+# Error Details:
+# {error_message}
+
+# Our technical team has been notified and is working to resolve this issue.
+# We'll have your service up and running as soon as possible.
+
+# Your payment has been processed successfully, and your service will be activated
+# once the technical issue is resolved.
+
+# If you have any questions, please don't hesitate to contact our support team.
+
+# Best regards,
+# The HostPro Team
+#         """
+        
+#         send_mail(
+#             subject,
+#             message,
+#             settings.DEFAULT_FROM_EMAIL,
+#             [service.user.email],
+#             fail_silently=False,
+#         )
+        
+#         # Also notify admin
+#         if hasattr(settings, 'ADMIN_EMAIL'):
+#             admin_message = f"""
+# VM Deployment Failed:
+
+# Service ID: {service_id}
+# User: {service.user.username} ({service.user.email})
+# Plan: {service.plan.name}
+# Error: {error_message}
+
+# Please investigate and resolve.
+#             """
+#             send_mail(
+#                 f'[URGENT] VM Deployment Failed - Service {service_id}',
+#                 admin_message,
+#                 settings.DEFAULT_FROM_EMAIL,
+#                 [settings.ADMIN_EMAIL],
+#                 fail_silently=True,
+#             )
+        
+#         return {'status': 'success'}
+#     except Exception as e:
+#         logger.error(f"Failed to send deployment failure email: {str(e)}")
+#         return {'status': 'error', 'message': str(e)}
+
 @shared_task
 def send_vm_deployment_failed_email(service_id, error_message):
     """Send email when VM deployment fails"""
@@ -156,59 +299,72 @@ def send_vm_deployment_failed_email(service_id, error_message):
         service = Service.objects.get(id=service_id)
         
         subject = '⚠️ Service Deployment Issue'
-        message = f"""
-Hello {service.user.first_name},
+        to = [service.user.email]
 
-We encountered an issue while deploying your {service.plan.name} service.
-
-Error Details:
-{error_message}
-
-Our technical team has been notified and is working to resolve this issue.
-We'll have your service up and running as soon as possible.
-
-Your payment has been processed successfully, and your service will be activated
-once the technical issue is resolved.
-
-If you have any questions, please don't hesitate to contact our support team.
-
-Best regards,
-The HostPro Team
-        """
-        
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [service.user.email],
-            fail_silently=False,
+        context ={
+            'name': service.user.first_name,
+            'plan_name': service.plan.name,
+            'status': service.status.upper(),
+            'error_message': error_message,
+            'year': timezone.now().year,
+        }
+        # Render HTML template
+        html_content = render_to_string('emails/vm_deployment_failed.html', context)
+        text_content = f"""Hello {service.user.first_name},
+                We encountered an issue while deploying your {service.plan.name} service.
+                Error Details:
+                {error_message}
+                Our technical team has been notified and is working to resolve this issue.
+                We'll have your service up and running as soon as possible.
+                Your payment has been processed successfully, and your service will be activated
+                once the technical issue is resolved.
+                If you have any questions, please don't hesitate to contact our support team.
+                Best regards,
+                The HostPro Team
+                 """
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=to
         )
-        
-        # Also notify admin
+        email.attach_alternative(html_content, "text/html")
+        email.send()
+
+        # email to admin
         if hasattr(settings, 'ADMIN_EMAIL'):
-            admin_message = f"""
-VM Deployment Failed:
-
-Service ID: {service_id}
-User: {service.user.username} ({service.user.email})
-Plan: {service.plan.name}
-Error: {error_message}
-
-Please investigate and resolve.
-            """
-            send_mail(
-                f'[URGENT] VM Deployment Failed - Service {service_id}',
-                admin_message,
-                settings.DEFAULT_FROM_EMAIL,
-                [settings.ADMIN_EMAIL],
-                fail_silently=True,
+            admin_context = {
+                'service_id': service_id,
+                'username': service.user.username,
+                'user_email': service.user.email,
+                'plan_name': service.plan.name,
+                'error_message': error_message,
+                'year': timezone.now().year,
+            }
+            admin_html_content = render_to_string('emails/admin_vm_deployment_failed.html', admin_context)
+            admin_text_content = f"""VM Deployment Failed:
+                Service ID: {service_id}
+                User: {service.user.username} ({service.user.email})
+                Plan: {service.plan.name}
+                Error: {error_message}
+                Please investigate and resolve.
+                 """
+            admin_email = EmailMultiAlternatives(
+                subject=f'[URGENT] VM Deployment Failed - Service {service_id}',
+                body=admin_text_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[settings.ADMIN_EMAIL]
             )
+            admin_email.attach_alternative(admin_html_content, "text/html")
+            admin_email.send()
         
         return {'status': 'success'}
     except Exception as e:
         logger.error(f"Failed to send deployment failure email: {str(e)}")
         return {'status': 'error', 'message': str(e)}
 
+
+# Check service renewals task
 @shared_task
 def check_service_renewals():
     """Check for services that need renewal"""
@@ -235,42 +391,81 @@ def check_service_renewals():
         # If past due date, suspend service
         if service.next_due_date < timezone.now():
             suspend_service_task.delay(service.id)
-
-@shared_task
-def send_renewal_reminder_email(service_id, invoice_id):
-    """Send renewal reminder email"""
-    try:
-        service = Service.objects.get(id=service_id)
-        invoice = Invoice.objects.get(id=invoice_id)
-        
-        subject = f'Service Renewal Due - {service.plan.name}'
-        message = f"""
-        Hello {service.user.first_name},
-        
-        Your {service.plan.name} service is due for renewal.
-        
-        Invoice: {invoice.invoice_number}
-        Amount: ${invoice.amount}
-        Due Date: {invoice.due_date.strftime('%Y-%m-%d')}
-        
-        Please make payment to avoid service suspension.
-        
-        Best regards,
-        Hosting Team
-        """
-        
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [service.user.email],
-            fail_silently=False,
-        )
-        
-        return {'status': 'success'}
-    except Exception as e:
-        return {'status': 'error', 'message': str(e)}
     
+# @shared_task
+# def send_service_credentials_email(service_id):
+#     """Send service credentials to user"""
+#     try:
+#         service = Service.objects.get(id=service_id)
+        
+#         subject = f'🎉 Your {service.plan.name} Service is Ready!'
+#         message = f"""
+# Hello {service.user.first_name}!
+
+# Great news! Your {service.plan.name} service has been successfully activated and deployed!
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🖥️  SERVICE DETAILS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# VM ID: {service.vm_id}
+# Plan: {service.plan.name}
+# Status: Active ✓
+
+# 📊 RESOURCES:
+# • CPU Cores: {service.plan.cpu_cores}
+# • RAM: {service.plan.ram_mb}MB
+# • Disk: {service.plan.disk_gb}GB SSD
+# • Bandwidth: {service.plan.bandwidth_gb}GB
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🔐 SSH ACCESS CREDENTIALS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# IP Address: {service.ip_address or 'Pending...'}
+# Username: {service.username}
+# Password: {service.password}
+
+# SSH Command:
+# ssh {service.username}@{service.ip_address}
+
+# ⚠️ IMPORTANT: Change your root password immediately after first login!
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 💰 BILLING INFORMATION
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Billing Cycle: {service.billing_cycle.title()}
+# Amount: ${service.price}
+# Next Due Date: {service.next_due_date.strftime('%B %d, %Y')}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# 📱 MANAGE YOUR SERVICE:
+# View your dashboard: {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://your-site.com'}/dashboard/
+
+# Need help? Contact our support team anytime!
+
+# Best regards,
+# The HostPro Team
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#         """
+        
+#         send_mail(
+#             subject,
+#             message,
+#             settings.DEFAULT_FROM_EMAIL,
+#             [service.user.email],
+#             fail_silently=False,
+#         )
+        
+#         logger.info(f"Credentials email sent for service {service_id}")
+#         return {'status': 'success'}
+#     except Exception as e:
+#         logger.error(f"Failed to send credentials email for service {service_id}: {str(e)}")
+#         return {'status': 'error', 'message': str(e)}
+
 @shared_task
 def send_service_credentials_email(service_id):
     """Send service credentials to user"""
@@ -278,67 +473,42 @@ def send_service_credentials_email(service_id):
         service = Service.objects.get(id=service_id)
         
         subject = f'🎉 Your {service.plan.name} Service is Ready!'
-        message = f"""
-Hello {service.user.first_name}!
+        from_email = settings.DEFAULT_FROM_EMAIL
+        to_email = [service.user.email]
 
-Great news! Your {service.plan.name} service has been successfully activated and deployed!
+        # context for email template
+        context = {
+            'name': service.user.first_name,
+            'plan_name': service.plan.name,
+            'vm_id': service.vm_id,
+            'ip_address': service.ip_address or 'Pending...',
+            'username': service.username,
+            'password': service.password,
+            'cpu': service.plan.cpu_cores,
+            'ram': service.plan.ram_mb,
+            'disk': service.plan.disk_gb,
+            'bandwidth': service.plan.bandwidth_gb,
+            'status': service.status.upper(),
+            'billing_cycle': service.billing_cycle.title(),
+            'amount': service.price,
+            'next_due_date': service.next_due_date.strftime('%B %d, %Y'),
+            'dashboard_url': f"{getattr(settings, 'SITE_URL', 'https://your-site.com')}/dashboard/",
+            'year': timezone.now().year, 
+        }
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🖥️  SERVICE DETAILS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # Render HTML template
+        html_content = render_to_string('emails/service_credentials.html', context)
 
-VM ID: {service.vm_id}
-Plan: {service.plan.name}
-Status: Active ✓
-
-📊 RESOURCES:
-• CPU Cores: {service.plan.cpu_cores}
-• RAM: {service.plan.ram_mb}MB
-• Disk: {service.plan.disk_gb}GB SSD
-• Bandwidth: {service.plan.bandwidth_gb}GB
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔐 SSH ACCESS CREDENTIALS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-IP Address: {service.ip_address or 'Pending...'}
-Username: {service.username}
-Password: {service.password}
-
-SSH Command:
-ssh {service.username}@{service.ip_address}
-
-⚠️ IMPORTANT: Change your root password immediately after first login!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💰 BILLING INFORMATION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Billing Cycle: {service.billing_cycle.title()}
-Amount: ${service.price}
-Next Due Date: {service.next_due_date.strftime('%B %d, %Y')}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📱 MANAGE YOUR SERVICE:
-View your dashboard: {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://your-site.com'}/dashboard/
-
-Need help? Contact our support team anytime!
-
-Best regards,
-The HostPro Team
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        """
+        text_content = f"Your {service.plan.name} service is ready. Please check your email for details."
         
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [service.user.email],
-            fail_silently=False,
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=from_email,
+            to=to_email
         )
-        
+        email.attach_alternative(html_content, "text/html")
+        email.send()
         logger.info(f"Credentials email sent for service {service_id}")
         return {'status': 'success'}
     except Exception as e:
@@ -373,6 +543,7 @@ def check_service_renewals():
         if service.next_due_date < timezone.now():
             suspend_service_task.delay(service.id)
 
+# send renewal reminder email
 @shared_task
 def send_renewal_reminder_email(service_id, invoice_id):
     """Send renewal reminder email"""
@@ -381,32 +552,34 @@ def send_renewal_reminder_email(service_id, invoice_id):
         invoice = Invoice.objects.get(id=invoice_id)
         
         subject = f'Service Renewal Due - {service.plan.name}'
-        message = f"""
-        Hello {service.user.first_name},
-        
-        Your {service.plan.name} service is due for renewal.
-        
-        Invoice: {invoice.invoice_number}
-        Amount: ${invoice.amount}
-        Due Date: {invoice.due_date.strftime('%Y-%m-%d')}
-        
-        Please make payment to avoid service suspension.
-        
-        Best regards,
-        Hosting Team
-        """
-        
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [service.user.email],
-            fail_silently=False,
+        to = [service.user.email]
+
+        context = {
+            'name': service.user.first_name,
+            'plan_name': service.plan.name,
+            'invoice_number': invoice.invoice_number,
+            'amount': invoice.amount,
+            'description': invoice.description,
+            'due_date': invoice.due_date.strftime('%B %d, %Y'),
+            'year': timezone.now().year,
+        }
+
+        # Render HTML template
+        html_content = render_to_string('emails/service_renewal_reminder.html', context)
+        text_content = f"Hello {service.user.first_name}, Your {service.plan.name} service is due for renewal. Invoice: {invoice.invoice_number}, Amount: ${invoice.amount}, Due Date: {invoice.due_date.strftime('%Y-%m-%d')}. Please make payment to avoid service suspension."
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=to
         )
+        email.attach_alternative(html_content, "text/html")
+        email.send()
         
         return {'status': 'success'}
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
+
 
 @shared_task
 def suspend_service_task(service_id):
@@ -429,6 +602,7 @@ def suspend_service_task(service_id):
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
 
+# suspension email task
 @shared_task
 def send_suspension_email(service_id):
     """Send service suspension email"""
@@ -436,24 +610,25 @@ def send_suspension_email(service_id):
         service = Service.objects.get(id=service_id)
         
         subject = f'Service Suspended - {service.plan.name}'
-        message = f"""
-        Hello {service.user.first_name},
-        
-        Your {service.plan.name} service has been suspended due to non-payment.
-        
-        Please make payment immediately to reactivate your service.
-        
-        Best regards,
-        Hosting Team
-        """
-        
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [service.user.email],
-            fail_silently=False,
+        context = {
+            'name': service.user.first_name,
+            'plan_name': service.plan.name,
+            'status': service.status,
+            'amount': service.price,
+            'year': timezone.now().year,
+        }
+
+        # Render HTML template
+        html_content = render_to_string('emails/service_suspension.html', context)
+        text_content = f"Hello {service.user.first_name}, Your {service.plan.name} service has been suspended due to non-payment. Please make payment immediately to reactivate your service."
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[service.user.email]
         )
+        email.attach_alternative(html_content, "text/html")
+        email.send()
         
         return {'status': 'success'}
     except Exception as e:
