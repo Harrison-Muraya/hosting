@@ -111,11 +111,16 @@
                 </div>
             </div>
             <div class="border-t border-gray-700 mt-8 pt-8 text-center">
-                <p class="text-gray-400">&copy; 2025 HostPro. All rights reserved.</p>
+                <p class="text-gray-400">&copy; <span id="year"></span> HostPro. All rights reserved.</p>
             </div>
         </div>
     </footer>
     <script>
+         document.addEventListener("DOMContentLoaded", function() {
+            const year = new Date().getFullYear();
+            document.getElementById("year").textContent = year;
+        });
+
        const logoutForm = document.getElementById('logout');
        logoutForm.addEventListener('submit', async (e) => {
            e.preventDefault();
