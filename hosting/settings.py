@@ -229,6 +229,14 @@ CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_USE_SESSIONS = False
 
+CSRF_TRUSTED_ORIGINS = [
+    'http://197.248.201.233:10000',
+    'http://192.168.100.28:8000',
+    'http://127.0.0.1:8000',
+    'http://localhost:8000',
+]
+
+
 # For development
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
