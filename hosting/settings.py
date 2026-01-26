@@ -231,11 +231,11 @@ CSRF_USE_SESSIONS = False
 
 CSRF_TRUSTED_ORIGINS = [
     'http://197.248.201.233:10000',
+    'https://197.248.201.233:10000',
     'http://192.168.100.28:8000',
     'http://127.0.0.1:8000',
     'http://localhost:8000',
 ]
-
 
 # For development
 if DEBUG:
