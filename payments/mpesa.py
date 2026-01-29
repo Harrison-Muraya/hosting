@@ -15,7 +15,6 @@ class MPesaClient:
         self.shortcode = settings.MPESA_SHORTCODE
         self.passkey = settings.MPESA_PASSKEY
         self.callback_url = settings.MPESA_CALLBACK_URL
-        print("Callback URL:", self.callback_url)
         if settings.MPESA_ENV == 'sandbox':
             self.base_url = 'https://sandbox.safaricom.co.ke'
         else:
@@ -48,7 +47,8 @@ class MPesaClient:
             'Password': password,
             'Timestamp': timestamp,
             'TransactionType': 'CustomerPayBillOnline',
-            'Amount': self.usd_to_kes(amount),
+            # 'Amount': self.usd_to_kes(amount), # Convert USD to KES
+            'Amount': amount,  # Amount in KES
             'PartyA': phone_number,
             'PartyB': self.shortcode,
             'PhoneNumber': phone_number,
