@@ -75,4 +75,7 @@ python manage.py populate_plans
 celery -A hosting worker -l info --pool=solo
 
 @REM To create a test VM using the management command, use the following:
-python manage.py create_test_vm --name test-vm --cores 1 --memory 1024 --disk 10 --delete  
+python manage.py create_test_vm --name test-vm --cores 1 --memory 1024 --disk 10 --delete 
+
+@REM To run email tests, use the following:
+python test_emails.py
